@@ -64,6 +64,12 @@ class MLP(nn.Module):
         return x
     
 batch_size = 128  # You can adjust this based on your GPU memory
+lr=0.001
+iterations=1000
+print_every=2000
+
+vf=MLP.to(device)
+
 
 trainloader = DataLoader(
     trainset,
@@ -77,3 +83,5 @@ testloader = DataLoader(
     batch_size=batch_size,
     shuffle=False,
     num_workers=2)
+
+
