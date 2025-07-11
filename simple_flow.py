@@ -1,5 +1,6 @@
 import torch
 import time
+from torch import nn, Tensor
 from flow_matching.path import AffineProbPath
 from flow_matching.path.scheduler import CondOTScheduler
 from flow_matching.solver import Solver, ODESolver
@@ -50,6 +51,18 @@ testset = torchvision.datasets.CIFAR10(
     transform=transform_test
 )
 
+
+class MLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.main=nn.Sequential(
+            nn.Conv2d(in_channels=3,out_channels=1,kernel_size=3)
+        )
+    
+    def forward(self, x: Tensor) -> Tensor:
+        output = self.main(x)
+        return x
+    
 batch_size = 128  # You can adjust this based on your GPU memory
 
 trainloader = DataLoader(
@@ -63,6 +76,4 @@ testloader = DataLoader(
     testset,
     batch_size=batch_size,
     shuffle=False,
-    num_workers=2
-)
-print(len(testset))
+    num_workers=2)
