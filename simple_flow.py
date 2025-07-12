@@ -59,7 +59,7 @@ class MLP(nn.Module):
             nn.Conv2d(in_channels=3,out_channels=3,kernel_size=3,padding=1)
         )
     
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, t: Tensor) -> Tensor:
         output = self.main(x)
         return output
     
@@ -97,7 +97,7 @@ for epoch in range(epochs):
         path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
         x_t=path_sample.x_t
         print(x_t.shape)
-        u_pred = vf(x_t)
+        u_pred = vf(x_t,path_sample.t)
         u_target = path_sample.dx_t
         print(u_pred.shape,u_target.shape)
         loss = criterion(u_pred,u_target)
