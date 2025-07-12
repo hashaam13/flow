@@ -56,20 +56,17 @@ class MLP(nn.Module):
     def __init__(self):
         super().__init__()
         self.main=nn.Sequential(
-            nn.Conv2d(in_channels=3,out_channels=1,kernel_size=3)
+            nn.Conv2d(in_channels=3,out_channels=3,kernel_size=3,padding=1)
         )
     
     def forward(self, x: Tensor) -> Tensor:
         output = self.main(x)
-        return x
+        return output
     
 batch_size = 128  # You can adjust this based on your GPU memory
 lr=0.001
-iterations=1000
+epochs=10
 print_every=2000
-
-vf=MLP.to(device)
-
 
 trainloader = DataLoader(
     trainset,
@@ -83,5 +80,30 @@ testloader = DataLoader(
     batch_size=batch_size,
     shuffle=False,
     num_workers=2)
+
+vf=MLP().to(device)
+path = AffineProbPath(scheduler=CondOTScheduler())
+optim = torch.optim.Adam(vf.parameters(),lr=lr)
+criterion = nn.MSELoss()
+
+start_time=time.time()
+for epoch in range(epochs):
+    running_loss = 0
+    for i, data in enumerate(trainloader):
+        optim.zero_grad()
+        x_1, y = data
+        x_0 = torch.randn_like(x_1).to(device)
+        t = torch.rand(x_1.shape[0]).to(device)
+        path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
+        x_t=path_sample.x_t
+        print(x_t.shape)
+        u_pred = vf(x_t)
+        u_target = path_sample.dx_t
+        print(u_pred.shape,u_target.shape)
+        loss = criterion(u_pred,u_target)
+        loss.backward()
+        optim.step()
+        break
+
 
 
