@@ -65,7 +65,7 @@ class MLP(nn.Module):
     
 batch_size = 128  # You can adjust this based on your GPU memory
 lr=0.001
-epochs=10
+epochs=1
 print_every=2000
 
 trainloader = DataLoader(
@@ -96,10 +96,12 @@ for epoch in range(epochs):
         t = torch.rand(x_1.shape[0]).to(device)
         path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
         x_t=path_sample.x_t
-        print(x_t.shape)
-        u_pred = vf(x_t,path_sample.t)
+        ts=path_sample.t
+        # print(x_t.shape)
+        print("time tensor",path_sample.t.shape)
+        u_pred = vf(x_t,t)
         u_target = path_sample.dx_t
-        print(u_pred.shape,u_target.shape)
+        # print(u_pred.shape,u_target.shape)
         loss = criterion(u_pred,u_target)
         loss.backward()
         optim.step()
