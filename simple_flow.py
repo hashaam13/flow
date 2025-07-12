@@ -12,6 +12,8 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import math
+from models import MLP, FourierEncoder
 
 
 if torch.cuda.is_available():
@@ -50,24 +52,12 @@ testset = torchvision.datasets.CIFAR10(
     download=True,
     transform=transform_test
 )
-
-
-class MLP(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.main=nn.Sequential(
-            nn.Conv2d(in_channels=3,out_channels=3,kernel_size=3,padding=1)
-        )
-    
-    def forward(self, x: Tensor, t: Tensor) -> Tensor:
-        output = self.main(x)
-        return output
     
 batch_size = 128  # You can adjust this based on your GPU memory
 lr=0.001
 epochs=1
 print_every=2000
-
+t_embed_dim = 10
 trainloader = DataLoader(
     trainset,
     batch_size=batch_size,
@@ -82,6 +72,7 @@ testloader = DataLoader(
     num_workers=2)
 
 vf=MLP().to(device)
+time_embedder = FourierEncoder(t_embed_dim).to(device)
 path = AffineProbPath(scheduler=CondOTScheduler())
 optim = torch.optim.Adam(vf.parameters(),lr=lr)
 criterion = nn.MSELoss()
@@ -99,6 +90,8 @@ for epoch in range(epochs):
         ts=path_sample.t
         # print(x_t.shape)
         print("time tensor",path_sample.t.shape)
+        embedded_t= time_embedder(ts)
+        print(embedded_t.shape)
         u_pred = vf(x_t,t)
         u_target = path_sample.dx_t
         # print(u_pred.shape,u_target.shape)
