@@ -14,7 +14,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import math
-from models import MLP, FourierEncoder,MNISTUNet
+from models import MLP, FourierEncoder,MNISTUNet, WrappedModel
 
 
 if torch.cuda.is_available():
@@ -99,10 +99,13 @@ for epoch in range(epochs):
         u_target = path_sample.dx_t
         # print(u_pred.shape,u_target.shape)
         loss = criterion(u_pred,u_target)
+        print(loss)
         loss.backward()
         optim.step()
         running_loss += loss.item()
-    
+        print(i)
+        break
+
     # Calculate average loss for the epoch
     epoch_loss = running_loss / len(trainloader)
     train_loss_history.append(epoch_loss)
@@ -145,3 +148,20 @@ plt.legend()
 plt.savefig('plots/final_training_loss.png')
 plt.show()
 
+wrapped_vf = WrappedModel(vf)
+
+
+step_size = 0.05
+
+norm = cm.colors.Normalize(vmax=50, vmin=0)
+
+batch_size = 11  # batch size
+eps_time = 1e-2
+T = torch.linspace(0,1,10).to(device)  # sample times
+Y = torch.linspace(0,10,11,dtype=torch.int).to(device)
+
+x_init = torch.randn((batch_size, 3, 32, 32), dtype=torch.float32, device=device)
+
+solver = ODESolver(velocity_model=wrapped_vf)  # create an ODESolver class
+sol = solver.sample(time_grid=T, x_init=x_init, method='midpoint', step_size=step_size, return_intermediates=True,label=Y)  # sample from the model
+print(sol.shape) # (sample_times, batch_size, channels, height,width)

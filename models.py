@@ -10,10 +10,16 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 import math
 from typing import Optional, List, Type, Tuple, Dict
+from torch.nn.modules import Module
 from flow_matching.path import AffineProbPath
 from flow_matching.path.scheduler import CondOTScheduler
 from flow_matching.solver import Solver, ODESolver
 from flow_matching.utils import ModelWrapper
+
+if torch.cuda.is_available():
+    device='cuda:0'
+else:
+    device='cpu'
 
 
 class MLP(nn.Module):
@@ -239,3 +245,11 @@ class MNISTUNet(nn.Module):
         #print(x.shape)
 
         return x
+    
+class WrappedModel(ModelWrapper):
+    def __init__(self, model: Module):
+        super().__init__(model)
+        self.nfe_counter = 0
+    def forward(self, x: torch.Tensor, t: torch.Tensor, label: torch.Tensor):
+        with torch.amp.autocast(device_type=device), torch.no_grad():
+            return self.model(x, t, y=label)

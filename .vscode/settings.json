@@ -2,7 +2,7 @@
     "files.watcherExclude": {
         "/home/hmuhammad/flow/data/**": true,
         "/home/hmuhammad/flow/checkpoints/**": true,
-        "/home/hmuhammad/flow/__pycache__": true,
-        "/home/hmuhammad/flow/plots": true
+        "/home/hmuhammad/flow/__pycache__/**": true,
+        "/home/hmuhammad/flow/plots/**": true
     }
 }
