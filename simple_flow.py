@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import math
-from models import MLP, FourierEncoder
+from models import MLP, FourierEncoder,MNISTUNet
 
 
 if torch.cuda.is_available():
@@ -71,8 +71,13 @@ testloader = DataLoader(
     shuffle=False,
     num_workers=2)
 
-vf=MLP().to(device)
-time_embedder = FourierEncoder(t_embed_dim).to(device)
+#vf=MLP().to(device)
+vf = MNISTUNet(
+    channels = [32, 64, 128],
+    num_residual_layers = 2,
+    t_embed_dim = 40,
+    y_embed_dim = 40,
+).to(device)
 path = AffineProbPath(scheduler=CondOTScheduler())
 optim = torch.optim.Adam(vf.parameters(),lr=lr)
 criterion = nn.MSELoss()
@@ -88,11 +93,7 @@ for epoch in range(epochs):
         path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
         x_t=path_sample.x_t
         ts=path_sample.t
-        # print(x_t.shape)
-        print("time tensor",path_sample.t.shape)
-        embedded_t= time_embedder(ts)
-        print(embedded_t.shape)
-        u_pred = vf(x_t,t)
+        u_pred = vf(x_t,t=t,y=y)
         u_target = path_sample.dx_t
         # print(u_pred.shape,u_target.shape)
         loss = criterion(u_pred,u_target)
