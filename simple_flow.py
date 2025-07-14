@@ -1,5 +1,6 @@
 import torch
 import time
+import os
 from torch import nn, Tensor
 from flow_matching.path import AffineProbPath
 from flow_matching.path.scheduler import CondOTScheduler
@@ -82,6 +83,7 @@ path = AffineProbPath(scheduler=CondOTScheduler())
 optim = torch.optim.Adam(vf.parameters(),lr=lr)
 criterion = nn.MSELoss()
 
+train_loss_history = []
 start_time=time.time()
 for epoch in range(epochs):
     running_loss = 0
@@ -99,7 +101,47 @@ for epoch in range(epochs):
         loss = criterion(u_pred,u_target)
         loss.backward()
         optim.step()
-        break
+        running_loss += loss.item()
+    
+    # Calculate average loss for the epoch
+    epoch_loss = running_loss / len(trainloader)
+    train_loss_history.append(epoch_loss)
 
+    print(f'Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Time: {time.time()-start_time:.2f}s')
+    
+    # Save checkpoint every N epochs or at the end
+    if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
+        checkpoint_path = f'checkpoints/model_epoch_{epoch+1}.pth'
+        torch.save({
+            'epoch': epoch + 1,
+            'model_state_dict': vf.state_dict(),
+            'optimizer_state_dict': optim.state_dict(),
+            'loss': epoch_loss,
+        }, checkpoint_path)
+        print(f'Saved checkpoint to {checkpoint_path}')
+    
+    # Plot and save loss curve
+    plt.figure()
+    plt.plot(train_loss_history, label='Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss Curve')
+    plt.legend()
+    plt.savefig('plots/training_loss.png')
+    plt.close()
 
+# Save final model
+final_model_path = 'checkpoints/final_model.pth'
+torch.save(vf.state_dict(), final_model_path)
+print(f'Saved final model to {final_model_path}')
+
+# Plot final loss curve
+plt.figure(figsize=(10, 6))
+plt.plot(train_loss_history, label='Training Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.title('Training Loss History')
+plt.legend()
+plt.savefig('plots/final_training_loss.png')
+plt.show()
 
