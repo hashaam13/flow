@@ -60,7 +60,7 @@ testset = torchvision.datasets.CIFAR10(
     
 batch_size = 128  # You can adjust this based on your GPU memory
 lr=0.001
-epochs=1
+epochs=10
 print_every=2000
 t_embed_dim = 10
 trainloader = DataLoader(
@@ -105,12 +105,10 @@ for epoch in range(epochs):
         u_target = path_sample.dx_t
         # print(u_pred.shape,u_target.shape)
         loss = criterion(u_pred,u_target)
-        print(loss)
         loss.backward()
         optim.step()
         running_loss += loss.item()
-        print(i)
-        break
+    
 
     # Calculate average loss for the epoch
     epoch_loss = running_loss / len(trainloader)
