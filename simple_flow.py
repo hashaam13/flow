@@ -59,10 +59,11 @@ testset = torchvision.datasets.CIFAR10(
 )
     
 batch_size = 128  # You can adjust this based on your GPU memory
-lr=0.001
-epochs=10
+lr=0.0001
+epochs=100
 print_every=2000
-t_embed_dim = 10
+t_embed_dim = 40
+y_embed_dim = 40
 trainloader = DataLoader(
     trainset,
     batch_size=batch_size,
@@ -80,8 +81,8 @@ testloader = DataLoader(
 vf = MNISTUNet(
     channels = [32, 64, 128],
     num_residual_layers = 2,
-    t_embed_dim = 40,
-    y_embed_dim = 40,
+    t_embed_dim = t_embed_dim,
+    y_embed_dim = y_embed_dim,
 ).to(device)
 path = AffineProbPath(scheduler=CondOTScheduler())
 optim = torch.optim.Adam(vf.parameters(),lr=lr)
@@ -161,7 +162,7 @@ norm = cm.colors.Normalize(vmax=50, vmin=0)
 
 batch_size = 11  # batch size
 eps_time = 1e-2
-T = torch.linspace(0,1,5).to(device)  # sample times
+T = torch.linspace(0,1,10).to(device)  # sample times
 Y = torch.linspace(0,10,11,dtype=torch.int).to(device)
 if len(Y) != batch_size:
     print("number of labels should match the batch size")
@@ -169,7 +170,7 @@ if len(Y) != batch_size:
 x_init = torch.randn((batch_size, 3, 32, 32), dtype=torch.float32, device=device)
 
 solver = ODESolver(velocity_model=wrapped_vf)  # create an ODESolver class
-sol = solver.sample(time_grid=T, x_init=x_init, method='midpoint', step_size=step_size, return_intermediates=True,label=Y)  # sample from the model
+sol = solver.sample( time_grid=T,x_init=x_init, method='midpoint', label=Y,step_size=step_size,return_intermediates=True)  # sample from the model
 print(sol.shape) # (sample_times, batch_size, channels, height,width)
 
 # Denormalize the images (reverse the Normalize transform)
