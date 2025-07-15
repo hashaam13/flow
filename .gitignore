@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 checkpoints/
 plots/
+output_samples/
