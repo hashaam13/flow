@@ -67,14 +67,14 @@ trainloader = DataLoader(
     trainset,
     batch_size=batch_size,
     shuffle=True,
-    num_workers=2  # For parallel data loading
+    num_workers=1  # For parallel data loading
 )
 
 testloader = DataLoader(
     testset,
     batch_size=batch_size,
     shuffle=False,
-    num_workers=2)
+    num_workers=1)
 
 #vf=MLP().to(device)
 vf = MNISTUNet(
@@ -94,10 +94,12 @@ for epoch in range(epochs):
     for i, data in enumerate(trainloader):
         optim.zero_grad()
         x_1, y = data
+        x_1 = x_1.to(device)
+        y = y.to(device)
         x_0 = torch.randn_like(x_1).to(device)
         t = torch.rand(x_1.shape[0]).to(device)
         path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
-        x_t=path_sample.x_t
+        x_t=path_sample.x_t.to(device)
         ts=path_sample.t
         u_pred = vf(x_t,t=t,y=y)
         u_target = path_sample.dx_t
@@ -171,8 +173,6 @@ x_init = torch.randn((batch_size, 3, 32, 32), dtype=torch.float32, device=device
 solver = ODESolver(velocity_model=wrapped_vf)  # create an ODESolver class
 sol = solver.sample(time_grid=T, x_init=x_init, method='midpoint', step_size=step_size, return_intermediates=True,label=Y)  # sample from the model
 print(sol.shape) # (sample_times, batch_size, channels, height,width)
-# Select the final time step (index -1)
-final_images = sol[-1]  # shape: (batch_size, 3, 32, 32)
 
 # Denormalize the images (reverse the Normalize transform)
 def denormalize(tensor, mean=(0.4914, 0.4822, 0.4465), std=(0.2023, 0.1994, 0.2010)):
@@ -182,8 +182,7 @@ def denormalize(tensor, mean=(0.4914, 0.4822, 0.4465), std=(0.2023, 0.1994, 0.20
     return tensor.clamp_(0, 1)  # Clamp to [0,1] range
 
 # Add this after your visualization code
-output_dir = "/home/hmuhammad/flow/output_images/"
-os.makedirs(output_dir, exist_ok=True)
+output_dir = "/home/hmuhammad/flow/output_samples/"
 
 # Save final images
 final_images = sol[-1].detach().cpu()
