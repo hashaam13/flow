@@ -180,10 +180,10 @@ class Decoder(nn.Module):
         return x
 
 class MNISTUNet(nn.Module):
-    def __init__(self, channels: List[int], num_residual_layers: int, t_embed_dim: int, y_embed_dim: int):
+    def __init__(self, channels: List[int], num_residual_layers: int, t_embed_dim: int, y_embed_dim: int,image_channels:int):
         super().__init__()
         # Initial convolution: (bs, 3, 32, 32) -> (bs, c_0, 32, 32)
-        self.init_conv = nn.Sequential(nn.Conv2d(3, channels[0], kernel_size=3, padding=1), nn.BatchNorm2d(channels[0]), nn.SiLU())
+        self.init_conv = nn.Sequential(nn.Conv2d(image_channels, channels[0], kernel_size=3, padding=1), nn.BatchNorm2d(channels[0]), nn.SiLU())
 
         # Initialize time embedder
         self.time_embedder = FourierEncoder(t_embed_dim)
@@ -203,7 +203,7 @@ class MNISTUNet(nn.Module):
         self.midcoder = Midcoder(channels[-1], num_residual_layers, t_embed_dim, y_embed_dim)
 
         # Final convolution
-        self.final_conv = nn.Conv2d(channels[0], 3, kernel_size=3, padding=1)
+        self.final_conv = nn.Conv2d(channels[0], image_channels, kernel_size=3, padding=1)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.Tensor):
         """

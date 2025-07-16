@@ -60,7 +60,7 @@ testset = torchvision.datasets.CIFAR10(
     
 batch_size = 128  # You can adjust this based on your GPU memory
 lr=0.0001
-epochs=100
+epochs=1
 print_every=2000
 t_embed_dim = 40
 y_embed_dim = 40
@@ -83,6 +83,7 @@ vf = MNISTUNet(
     num_residual_layers = 2,
     t_embed_dim = t_embed_dim,
     y_embed_dim = y_embed_dim,
+    image_channels=3
 ).to(device)
 path = AffineProbPath(scheduler=CondOTScheduler())
 optim = torch.optim.Adam(vf.parameters(),lr=lr)
@@ -171,26 +172,30 @@ x_init = torch.randn((batch_size, 3, 32, 32), dtype=torch.float32, device=device
 
 solver = ODESolver(velocity_model=wrapped_vf)  # create an ODESolver class
 sol = solver.sample( time_grid=T,x_init=x_init, method='midpoint', label=Y,step_size=step_size,return_intermediates=True)  # sample from the model
-print(sol.shape) # (sample_times, batch_size, channels, height,width)
+print(sol.shape)  # (sample_times, batch_size, 1, height, width) for MNIST
 
-# Denormalize the images (reverse the Normalize transform)
-def denormalize(tensor, mean=(0.4914, 0.4822, 0.4465), std=(0.2023, 0.1994, 0.2010)):
-    """Denormalize a tensor image with mean and std."""
-    for t, m, s in zip(tensor, mean, std):
-        t.mul_(s).add_(m)  # Multiply by std and add mean
-    return tensor.clamp_(0, 1)  # Clamp to [0,1] range
+# Modified denormalization for MNIST (single channel)
+def denormalize_mnist(tensor, mean=(0.5,), std=(0.5,)):
+    """Reverse transforms.Normalize((0.5,), (0.5,)) for MNIST"""
+    # tensor shape: [C, H, W] -> [1, 32, 32] for MNIST
+    return tensor * std[0] + mean[0]  # Simpler single-channel version
 
-# Add this after your visualization code
+# Create output directory
 output_dir = "/home/hmuhammad/flow/output_samples/"
+os.makedirs(output_dir, exist_ok=True)
 
 # Save final images
-final_images = sol[-1].detach().cpu()
+final_images = sol[-1].detach().cpu()  # shape: [batch_size, 1, 32, 32]
 for i in range(batch_size):
-    img = final_images[i]
-    img_denorm = denormalize(img)  # Use your denormalize function
-    plt.imshow(img_denorm.permute(1, 2, 0))
+    img = final_images[i]  # [1, 32, 32]
+    img_denorm = denormalize_mnist(img).clamp(0, 1)  # [0,1] range
+    
+    plt.imshow(img_denorm.squeeze(), cmap='gray')  # Remove channel dim and use grayscale
     plt.axis('off')
-    plt.savefig(f"{output_dir}final_image_{i}.png", bbox_inches='tight', pad_inches=0)
+    plt.savefig(f"{output_dir}mnist_sample_{i}.png", 
+               bbox_inches='tight', 
+               pad_inches=0, 
+               dpi=100)
     plt.close()
 
-print(f"Saved {batch_size} images to {output_dir}")
+print(f"Saved {batch_size} MNIST samples to {output_dir}")
