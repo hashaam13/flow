@@ -3,8 +3,6 @@ import time
 from torch import nn, Tensor
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import torchvision
-import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -253,3 +251,48 @@ class WrappedModel(ModelWrapper):
     def forward(self, x: torch.Tensor, t: torch.Tensor, label: torch.Tensor):
         with torch.amp.autocast(device_type=device), torch.no_grad():
             return self.model(x, t, y=label)
+        
+# Activation class
+class Swish(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return torch.sigmoid(x) * x
+
+# Model class
+class MLP1(nn.Module):
+    def __init__(
+        self, input_dim: int = 128, time_dim: int = 1, hidden_dim=128, length=2):
+        super().__init__()
+        self.input_dim = input_dim
+        self.time_dim = time_dim
+        self.hidden_dim = hidden_dim
+
+        self.time_embedding = nn.Linear(1, time_dim)
+        self.token_embedding = torch.nn.Embedding(self.input_dim, hidden_dim)
+
+        self.main = nn.Sequential(
+            Swish(),
+            nn.Linear(hidden_dim * length + time_dim, hidden_dim),
+            Swish(),
+            nn.Linear(hidden_dim, hidden_dim),
+            Swish(),
+            nn.Linear(hidden_dim, hidden_dim),
+            Swish(),
+            nn.Linear(hidden_dim, self.input_dim * length),
+        )
+
+    def forward(self, x, t):
+        t = self.time_embedding(t.unsqueeze(-1))
+        x = self.token_embedding(x)
+
+        B, N, d = x.shape
+        x = x.reshape(B, N * d)
+
+        h = torch.cat([x, t], dim=1)
+        h = self.main(h)
+
+        h = h.reshape(B, N, self.input_dim)
+
+        return h

@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from datasets import load_dataset
 from transformers import AutoTokenizer
+from models import MLP1
 
 # flow_matching
 from flow_matching.path import MixtureDiscreteProbPath
@@ -74,11 +75,18 @@ batch_input_ids = train_data["input_ids"]    # [samples,sequences_length=512]
 #  print("Decoded Text:", " ".join([id_to_token[id.item()] for id in batch_input_ids[0] if id != tokenizer.pad_token_id]))
 batch_size = 32
 vocab_size = tokenizer.vocab_size
+epsilon = 1e-3
+hidden_dim=64
 
 # instantiate a convex path object
 scheduler = PolynomialConvexScheduler(n=2)
 path = MixtureDiscreteProbPath(scheduler=scheduler)
-epsilon = 1e-3
+
+#loss function
+loss_fn = MixturePathGeneralizedKL(path=path)
+
+probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim).to(device)
+
 
 
 dataloader = DataLoader(
@@ -90,3 +98,12 @@ dataloader = DataLoader(
 for i,data in enumerate(dataloader):
     x_1=data.to(device) # (batch_size,seq_length=512)
     x_0=torch.randint_like(x_1,high=vocab_size,device=device)
+    t = torch.rand(x_1.shape[0]).to(device)*(1-epsilon)
+    # sample probability path
+    path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
+    logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t)
+    # discrete lfow matching generalizedKL loss
+    loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.x_t)
+    loss.backward()
+    optim.step()
+    break
