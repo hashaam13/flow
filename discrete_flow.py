@@ -56,19 +56,11 @@ def tokenize_and_save(split, max_length=512):
     }, os.path.join(save_dir, f"imdb_{split}_tokenized.pt"))
 
 # Save train/test splits
-tokenize_and_save("train")
-tokenize_and_save("test")
+# tokenize_and_save("train")
+# tokenize_and_save("test")
 
-# Save vocabulary for decoding later
-with open(os.path.join(save_dir, "imdb_vocab.pkl"), "wb") as f:
-    pickle.dump({
-        "vocab": tokenizer.get_vocab(),
-        "id_to_token": {v: k for k, v in tokenizer.get_vocab().items()}
-    }, f)
-
-
-train_data = torch.load(f"{save_dir}/imdb_train_tokenized.pt")  # Updated path
-test_data = torch.load(f"{save_dir}/imdb_test_tokenized.pt")    # Updated path
+train_data = torch.load(f"{save_dir}/imdb_train_tokenized.pt")  # dictionary {input_ids,attention_mask,texts}
+test_data = torch.load(f"{save_dir}/imdb_test_tokenized.pt")    
 
 # Load vocabulary (with full path)
 with open(f"{save_dir}/imdb_vocab.pkl", "rb") as f:            # Updated path
@@ -76,9 +68,25 @@ with open(f"{save_dir}/imdb_vocab.pkl", "rb") as f:            # Updated path
     id_to_token = vocab["id_to_token"]
 
 # Example usage (unchanged)
-batch_input_ids = train_data["input_ids"][:32]  # First 32 samples
-batch_attention_mask = train_data["attention_mask"][:32]
+batch_input_ids = train_data["input_ids"]    # [samples,sequences_length=512]
 
-print("Sample Token IDs:", batch_input_ids[0])
-print("Decoded Text:", 
-      " ".join([id_to_token[id.item()] for id in batch_input_ids[0] if id != tokenizer.pad_token_id]))
+# print("Sample Token IDs:", batch_input_ids[0])
+#  print("Decoded Text:", " ".join([id_to_token[id.item()] for id in batch_input_ids[0] if id != tokenizer.pad_token_id]))
+batch_size = 32
+vocab_size = tokenizer.vocab_size
+
+# instantiate a convex path object
+scheduler = PolynomialConvexScheduler(n=2)
+path = MixtureDiscreteProbPath(scheduler=scheduler)
+epsilon = 1e-3
+
+
+dataloader = DataLoader(
+    dataset=batch_input_ids,
+    batch_size=batch_size,
+    shuffle=True
+    )
+
+for i,data in enumerate(dataloader):
+    x_1=data.to(device) # (batch_size,seq_length=512)
+    x_0=torch.randint_like(x_1,high=vocab_size,device=device)
