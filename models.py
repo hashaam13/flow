@@ -263,7 +263,7 @@ class Swish(nn.Module):
 # Model class
 class MLP1(nn.Module):
     def __init__(
-        self, input_dim: int = 128, time_dim: int = 1, hidden_dim=128, length=2):
+        self, input_dim: int = 128, time_dim: int = 1, hidden_dim=128, length=512):
         super().__init__()
         self.input_dim = input_dim
         self.time_dim = time_dim
@@ -286,7 +286,6 @@ class MLP1(nn.Module):
     def forward(self, x, t):
         t = self.time_embedding(t.unsqueeze(-1))
         x = self.token_embedding(x)
-
         B, N, d = x.shape
         x = x.reshape(B, N * d)
 
@@ -294,5 +293,6 @@ class MLP1(nn.Module):
         h = self.main(h)
 
         h = h.reshape(B, N, self.input_dim)
+
 
         return h

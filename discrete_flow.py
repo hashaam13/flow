@@ -77,6 +77,8 @@ batch_size = 32
 vocab_size = tokenizer.vocab_size
 epsilon = 1e-3
 hidden_dim=64
+seq_length=512
+lr=0.001
 
 # instantiate a convex path object
 scheduler = PolynomialConvexScheduler(n=2)
@@ -85,8 +87,8 @@ path = MixtureDiscreteProbPath(scheduler=scheduler)
 #loss function
 loss_fn = MixturePathGeneralizedKL(path=path)
 
-probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim).to(device)
-
+probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
+optim=optim.Adam(probability_denoiser.parameters(),lr=lr)
 
 
 dataloader = DataLoader(
@@ -101,9 +103,10 @@ for i,data in enumerate(dataloader):
     t = torch.rand(x_1.shape[0]).to(device)*(1-epsilon)
     # sample probability path
     path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
+
     logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t)
     # discrete lfow matching generalizedKL loss
-    loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.x_t)
+    loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.t)
     loss.backward()
     optim.step()
     break
