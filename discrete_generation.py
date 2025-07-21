@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from datasets import load_dataset
 from transformers import AutoTokenizer
-from models import MLP1
+from models import MLP1, TransformerDenoiser
 
 # flow_matching
 from flow_matching.path import MixtureDiscreteProbPath
@@ -45,14 +45,15 @@ class WrappedModel(ModelWrapper):
 hidden_dim=64
 seq_length=512
     
-checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_80.pth"
+checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_30.pth"
 checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
 
 # 2. Initialize your model architecture first (must match original)
 # Assuming you have a ProbabilityDenoiser class defined elsewhere
-probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
-
+#probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
+probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=64,nhead=4, num_layers=6).to(device)
 # 3. Load the state dict
+probability_denoiser = nn.DataParallel(probability_denoiser)
 probability_denoiser.load_state_dict(checkpoint['model_state_dict'])
 probability_denoiser.eval()  # Set to evaluation mode
 

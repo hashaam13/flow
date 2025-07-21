@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from datasets import load_dataset
 from transformers import AutoTokenizer
-from models import MLP1
+from models import MLP1,TransformerDenoiser
 
 # flow_matching
 from flow_matching.path import MixtureDiscreteProbPath
@@ -23,6 +23,7 @@ from flow_matching.path.scheduler import PolynomialConvexScheduler
 from flow_matching.solver import MixtureDiscreteEulerSolver
 from flow_matching.utils import ModelWrapper
 from flow_matching.loss import MixturePathGeneralizedKL
+from torch.nn.parallel import DataParallel
 
 if torch.cuda.is_available():
     device='cuda:0'
@@ -75,13 +76,13 @@ batch_input_ids = train_data["input_ids"]    # [samples,sequences_length=512]
 
 # print("Sample Token IDs:", batch_input_ids[0])
 #  print("Decoded Text:", " ".join([id_to_token[id.item()] for id in batch_input_ids[0] if id != tokenizer.pad_token_id]))
-batch_size = 200
+batch_size = 80
 vocab_size = tokenizer.vocab_size
 epsilon = 1e-3
 hidden_dim=64
 seq_length=512
 lr=0.001
-epochs=80
+epochs=30
 
 # instantiate a convex path object
 scheduler = PolynomialConvexScheduler(n=2)
@@ -90,14 +91,18 @@ path = MixtureDiscreteProbPath(scheduler=scheduler)
 #loss function
 loss_fn = MixturePathGeneralizedKL(path=path)
 
-probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
+#probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
+probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=64,nhead=4, num_layers=6).to(device)
+if torch.cuda.device_count() > 1:
+    print(f"Using {torch.cuda.device_count()} GPUs!")
+    probability_denoiser = DataParallel(probability_denoiser, device_ids=[0,1])
 optim=optim.Adam(probability_denoiser.parameters(),lr=lr)
-
 
 dataloader = DataLoader(
     dataset=batch_input_ids,
     batch_size=batch_size,
-    shuffle=True
+    shuffle=True,
+    num_workers=1
     )
 # 1. Setup plot directory
 plot_dir = "/home/hmuhammad/flow/plots"
