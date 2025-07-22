@@ -76,13 +76,13 @@ batch_input_ids = train_data["input_ids"]    # [samples,sequences_length=512]
 
 # print("Sample Token IDs:", batch_input_ids[0])
 #  print("Decoded Text:", " ".join([id_to_token[id.item()] for id in batch_input_ids[0] if id != tokenizer.pad_token_id]))
-batch_size = 80
+batch_size = 64
 vocab_size = tokenizer.vocab_size
 epsilon = 1e-3
 hidden_dim=64
 seq_length=512
-lr=0.001
-epochs=30
+lr=0.0001
+epochs=40
 
 # instantiate a convex path object
 scheduler = PolynomialConvexScheduler(n=2)
@@ -92,7 +92,7 @@ path = MixtureDiscreteProbPath(scheduler=scheduler)
 loss_fn = MixturePathGeneralizedKL(path=path)
 
 #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
-probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=64,nhead=4, num_layers=6).to(device)
+probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
 if torch.cuda.device_count() > 1:
     print(f"Using {torch.cuda.device_count()} GPUs!")
     probability_denoiser = DataParallel(probability_denoiser, device_ids=[0,1])
