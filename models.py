@@ -8,6 +8,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import math
+import numpy as np
+import copy
 from typing import Optional, List, Type, Tuple, Dict
 from torch.nn.modules import Module
 from flow_matching.path import AffineProbPath
