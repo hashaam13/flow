@@ -14,8 +14,6 @@ from torch.utils.data import DataLoader
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-from datasets import load_dataset
-from transformers import AutoTokenizer
 from models import MLP1,TransformerDenoiser
 
 # flow_matching
@@ -38,12 +36,11 @@ save_dir = "/home/hmuhammad/flow/data"
 
 
 # Load vocabulary (with full path)
-with open(f"{save_dir}/DeepFlyBrain_data.pkl", "rb") as f:            
-    data = pickle.load(f)#dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
-train_data = data['train_data'] #numpy array (83726, 500, 4)
-y_train = data['y_train'] #numpy array (83726, 81)
-#print(train_data[0][:10])
-#print(y_train[0])
+# 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
+with open(f"{save_dir}/DeepMEL2_data.pkl", "rb") as f:            
+    data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
+train_data = data['train_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
+y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
 
 seqs = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
 clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) #numpy array (83726)
@@ -54,7 +51,7 @@ epsilon = 1e-3
 hidden_dim=64
 seq_length=500
 lr=0.0001
-epochs=21
+epochs=1
 
 # instantiate a convex path object
 scheduler = PolynomialConvexScheduler(n=2)
