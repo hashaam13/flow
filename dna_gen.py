@@ -1,6 +1,5 @@
-order = {"A": 0, "C": 1, "G": 2, "T": 3}
-
 import torch
+import ml_collections
 import time
 import os
 import json
@@ -15,8 +14,6 @@ from torch.utils.data import DataLoader
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-from datasets import load_dataset
-from transformers import AutoTokenizer
 from models import MLP1, TransformerDenoiser
 
 # flow_matching
@@ -78,7 +75,7 @@ sol = solver.sample(x_init=x_init,
                     time_grid=linspace_to_plot)
 print(sol.shape) # [sampling_steps, n_samples, seq_length]
 
-# Assuming sol is your tensor with shape [9, 2, 512]
+# Assuming sol is your tensor with shape [9, 2, 500]
 last_generation = sol[-1, 0]  # Gets last timestep (-1), first sample (0)
 last_generation = last_generation.cpu().numpy()
 decoded_text = []

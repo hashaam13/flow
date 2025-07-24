@@ -42,21 +42,21 @@ class Dense(nn.Module):
 
 
 class CNNModel(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, vocab_size, hidden_dim, num_cnn_stacks,p_dropout,):
         super().__init__()
-        self.cfg = cfg
-        self.alphabet_size = cfg.data.S
-        self.num_cls = cfg.data.num_classes
-        self.classifier = cfg.model.classifier
-        if "cls_free_guidance" in cfg.model:
-            self.cls_free_guidance = cfg.model.cls_free_guidance
-        else:
-            self.cls_free_guidance = False
-        hidden_dim = cfg.model.hidden_dim
-        num_cnn_stacks = cfg.model.num_cnn_stacks
-        p_dropout = cfg.model.p_dropout
-        self.clean_data = cfg.data.clean_data
-
+        self.alphabet_size = vocab_size
+        #self.num_cls = cfg.data.num_classes
+        #self.classifier = cfg.model.classifier
+        #if "cls_free_guidance" in cfg.model:
+        #    self.cls_free_guidance = cfg.model.cls_free_guidance
+        #else:
+        #    self.cls_free_guidance = False
+        hidden_dim = hidden_dim
+        num_cnn_stacks = num_cnn_stacks
+        p_dropout = p_dropout
+        self.clean_data = False
+        self.cls_free_guidance = False
+        self.classifier= False
         if self.clean_data:
             self.linear = nn.Embedding(
                 self.alphabet_size, embedding_dim=cfg.model.hidden_dim
@@ -117,14 +117,14 @@ class CNNModel(nn.Module):
                 [Dense(hidden_dim, hidden_dim) for _ in range(self.num_layers)]
             )
 
-    def forward(self, batch_data, t, return_embedding=False):
+    def forward(self, x, t, return_embedding=False):
         """
         Args:
             batch_data(dict):
                 x: Input sequence, shape (B, D)
             t: Input time, shape (B,)
         """
-        seq, cls = batch_data
+        seq = x
 
         if self.clean_data:
             feat = self.linear(seq)
@@ -142,8 +142,6 @@ class CNNModel(nn.Module):
             feat = seq_encoded.permute(0, 2, 1)
             feat = F.relu(self.linear(feat))
 
-        if self.cls_free_guidance and not self.classifier:
-            cls_emb = self.cls_embedder(cls)
 
         # Input shape (B, S, D)
         for i in range(self.num_layers):
