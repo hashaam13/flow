@@ -15,6 +15,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from models import MLP1, TransformerDenoiser
+from dna_model import CNNModel
 
 # flow_matching
 from flow_matching.path import MixtureDiscreteProbPath
@@ -41,13 +42,15 @@ class WrappedModel(ModelWrapper):
 vocab_size = 4   
 seq_length=500
     
-checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_21.pth"
-checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))
+checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_220.pth"
+checkpoint = torch.load(checkpoint_path, map_location=torch.device(device),weights_only=False)
 
 # 2. Initialize your model architecture first (must match original)
 # Assuming you have a ProbabilityDenoiser class defined elsewhere
 #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
 probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
+#probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0).to(device)
+
 # 3. Load the state dict
 #probability_denoiser = nn.DataParallel(probability_denoiser)
 probability_denoiser.load_state_dict(checkpoint['model_state_dict'])
@@ -59,7 +62,7 @@ nfe = 64
 step_size = 1 / nfe
 
 safe_sampling = True
-n_samples = 2
+n_samples = 3
 dim = seq_length
 epsilon=1e-3
 
@@ -76,7 +79,7 @@ sol = solver.sample(x_init=x_init,
 print(sol.shape) # [sampling_steps, n_samples, seq_length]
 
 # Assuming sol is your tensor with shape [9, 2, 500]
-last_generation = sol[-1, 0]  # Gets last timestep (-1), first sample (0)
+last_generation = sol[-1, 1]  # Gets last timestep (-1), first sample (0)
 last_generation = last_generation.cpu().numpy()
 decoded_text = []
 # Load tokenizer and decode

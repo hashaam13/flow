@@ -38,7 +38,7 @@ save_dir = "/home/hmuhammad/flow/data"
 
 # Load vocabulary (with full path)
 # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
-with open(f"{save_dir}/DeepMEL2_data.pkl", "rb") as f:            
+with open(f"{save_dir}/DeepFlyBrain_data.pkl", "rb") as f:            
     data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
 train_data = data['train_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
 y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
@@ -46,15 +46,16 @@ y_train = data['y_train']                                #numpy array (83726, 81
 seqs = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
 clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) #numpy array (83726)
 
-batch_size = 1024
+batch_size = 768
 vocab_size = 4
 epsilon = 1e-3
 hidden_dim=64
 seq_length=500
-lr=0.0001 # 5e-4
-epochs=1 # 918,1084 for deeplMEL2
+lr=0.0005 # 5e-4
+epochs=220 # 918 for flybrain,1084 for deeplMEL2
 n_iters=300000
 warmup=500
+clip_grad = True
 
 # instantiate a convex path object
 scheduler = PolynomialConvexScheduler(n=2)
@@ -64,13 +65,13 @@ path = MixtureDiscreteProbPath(scheduler=scheduler)
 loss_fn = MixturePathGeneralizedKL(path=path)
 
 #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
-#probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
-probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0).to(device)
+probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
+#probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0).to(device)
 
 if torch.cuda.device_count() > 1:
     print(f"Using {torch.cuda.device_count()} GPUs!")
     probability_denoiser = DataParallel(probability_denoiser, device_ids=[0,1])
-optim=optim.Adam(probability_denoiser.parameters(),lr=lr)
+optimizer=optim.Adam(probability_denoiser.parameters(),lr=lr)
 
 dataloader = DataLoader(
     dataset=seqs,
@@ -87,24 +88,32 @@ timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 train_losses = []
 best_loss = float('inf')
 start_time=time.time()
+n_iter = 0
 for epoch in range(epochs):
     epoch_loss = 0.0
     probability_denoiser.train()
     
     for i, data in enumerate(dataloader):
-        optim.zero_grad()
+        n_iter +=1
+        optimizer.zero_grad()
         
         x_1 = data.to(device)
         x_0 = torch.randint_like(x_1, high=vocab_size, device=device)
         t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)
         
         path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
-        #logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t)
         logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t)
         loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.t)
         
+        if clip_grad:
+            torch.nn.utils.clip_grad_norm_(probability_denoiser.parameters(), 1.0)
+        if warmup > 0:
+            for g in optimizer.param_groups:
+                g["lr"] = lr * np.minimum(n_iter / warmup, 1.0)
+
+
         loss.backward()
-        optim.step()
+        optimizer.step()
         epoch_loss += loss.item()
 
         # Print batch progress
@@ -121,7 +130,7 @@ for epoch in range(epochs):
         torch.save({
             'epoch': epoch + 1,
             'model_state_dict': probability_denoiser.state_dict(),
-            'optimizer_state_dict': optim.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
             'loss': avg_epoch_loss,
         }, checkpoint_path)
         print(f'Saved checkpoint to {checkpoint_path}')
