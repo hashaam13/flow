@@ -208,38 +208,33 @@ class DDitFinalLayer(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, vocab_size: int, masked: bool, config: DictConfig):
+    def __init__(self, vocab_size: int, masked: bool,hidden_size,cond_dim,n_heads,n_blocks,dropout):
         super().__init__()
-
-        if isinstance(config, dict):
-            config = OmegaConf.create(config)
-
-        self.config = config
         self.vocab_size = vocab_size
 
         add_token = 1 if masked else 0
 
-        self.vocab_embed = nn.Embedding(self.vocab_size + add_token, config.hidden_size)
+        self.vocab_embed = nn.Embedding(self.vocab_size + add_token, hidden_size)
 
-        self.time_embedding = TimestepEmbedder(hidden_size=config.cond_dim)
-        self.rotary_emb = rotary.Rotary(dim=config.hidden_size // config.n_heads)
+        self.time_embedding = TimestepEmbedder(hidden_size=cond_dim)
+        self.rotary_emb = rotary.Rotary(dim=hidden_size // n_heads)
 
         self.blocks = nn.ModuleList(
             [
                 DDiTBlock(
-                    dim=config.hidden_size,
-                    n_heads=config.n_heads,
-                    cond_dim=config.cond_dim,
-                    dropout=config.dropout,
+                    dim=hidden_size,
+                    n_heads=n_heads,
+                    cond_dim=cond_dim,
+                    dropout=dropout,
                 )
-                for _ in range(config.n_blocks)
+                for _ in range(n_blocks)
             ]
         )
 
         self.output_layer = DDitFinalLayer(
-            hidden_size=config.hidden_size,
+            hidden_size=hidden_size,
             out_channels=vocab_size + add_token,
-            cond_dim=config.cond_dim,
+            cond_dim=cond_dim,
         )
 
     def forward(self, x_t: Tensor, time: Tensor) -> Tensor:

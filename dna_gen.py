@@ -15,6 +15,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from models import MLP1, TransformerDenoiser
+from model import transformer
 from dna_model import CNNModel
 
 # flow_matching

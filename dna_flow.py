@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from models import MLP1,TransformerDenoiser
 from dna_model import CNNModel
+from model import Transformer
 
 # flow_matching
 from flow_matching.path import MixtureDiscreteProbPath
@@ -46,7 +47,7 @@ y_train = data['y_train']                                #numpy array (83726, 81
 seqs = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
 clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) #numpy array (83726)
 
-batch_size = 768
+batch_size = 256
 vocab_size = 4
 epsilon = 1e-3
 hidden_dim=64
@@ -65,9 +66,9 @@ path = MixtureDiscreteProbPath(scheduler=scheduler)
 loss_fn = MixturePathGeneralizedKL(path=path)
 
 #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
-probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
+#probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
 #probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0).to(device)
-
+probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
 if torch.cuda.device_count() > 1:
     print(f"Using {torch.cuda.device_count()} GPUs!")
     probability_denoiser = DataParallel(probability_denoiser, device_ids=[0,1])
@@ -102,14 +103,14 @@ for epoch in range(epochs):
         t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)
         
         path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
-        logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t)
+        logits = probability_denoiser(x_t=path_sample.x_t, time=path_sample.t)
         loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.t)
         
-        if clip_grad:
-            torch.nn.utils.clip_grad_norm_(probability_denoiser.parameters(), 1.0)
-        if warmup > 0:
-            for g in optimizer.param_groups:
-                g["lr"] = lr * np.minimum(n_iter / warmup, 1.0)
+        # if clip_grad:
+        #     torch.nn.utils.clip_grad_norm_(probability_denoiser.parameters(), 1.0)
+        # if warmup > 0:
+        #     for g in optimizer.param_groups:
+        #         g["lr"] = lr * np.minimum(n_iter / warmup, 1.0)
 
 
         loss.backward()
