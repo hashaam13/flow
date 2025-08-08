@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-from models import MLP1, TransformerDenoiser
-from model import transformer
+from models import MLP1, TransformerDenoiser,WrappedModel
+from model import Transformer
 from dna_model import CNNModel
 
 # flow_matching
@@ -36,22 +36,22 @@ torch.manual_seed(42)
 
 scheduler = PolynomialConvexScheduler(n=2)
 path = MixtureDiscreteProbPath(scheduler=scheduler)
-class WrappedModel(ModelWrapper):
-    def forward(self, x: torch.Tensor, t: torch.Tensor, **extras):
-        return torch.softmax(self.model(x, t), dim=-1)
+#class WrappedModel(ModelWrapper):
+#    def forward(self, x: torch.Tensor, t: torch.Tensor, **extras):
+#        return torch.softmax(self.model(x, t), dim=-1)
 
 vocab_size = 4   
 seq_length=500
     
-checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_220.pth"
+checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_60.pth"
 checkpoint = torch.load(checkpoint_path, map_location=torch.device(device),weights_only=False)
 
 # 2. Initialize your model architecture first (must match original)
 # Assuming you have a ProbabilityDenoiser class defined elsewhere
 #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
-probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
-#probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0).to(device)
-
+#probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
+probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0,num_classes=81).to(device)
+#probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
 # 3. Load the state dict
 #probability_denoiser = nn.DataParallel(probability_denoiser)
 probability_denoiser.load_state_dict(checkpoint['model_state_dict'])
@@ -68,7 +68,7 @@ dim = seq_length
 epsilon=1e-3
 
 x_init = torch.randint(size=(n_samples, dim), high=vocab_size, device=device)
-
+y = torch.LongTensor([1,2,3])
 n_plots = 9
 linspace_to_plot = torch.linspace(0,  1 - epsilon, n_plots)
 
@@ -76,11 +76,13 @@ sol = solver.sample(x_init=x_init,
                     step_size=step_size,
                     verbose=True,
                     return_intermediates=True,
-                    time_grid=linspace_to_plot)
+                    time_grid=linspace_to_plot,
+                    label=y,
+                    cfg_scale=3)
 print(sol.shape) # [sampling_steps, n_samples, seq_length]
 
 # Assuming sol is your tensor with shape [9, 2, 500]
-last_generation = sol[-1, 1]  # Gets last timestep (-1), first sample (0)
+last_generation = sol[-1, 2]  # Gets last timestep (-1), first sample (0)
 last_generation = last_generation.cpu().numpy()
 decoded_text = []
 # Load tokenizer and decode

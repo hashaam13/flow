@@ -251,9 +251,12 @@ class WrappedModel(ModelWrapper):
     def __init__(self, model: Module):
         super().__init__(model)
         self.nfe_counter = 0
-    def forward(self, x: torch.Tensor, t: torch.Tensor, label: torch.Tensor):
+    def forward(self, x: torch.Tensor, t: torch.Tensor, label: torch.Tensor,cfg_scale):
         with torch.amp.autocast(device_type=device), torch.no_grad():
-            return self.model(x, t, y=label)
+            uncond_logits = self.model(x, t, cls=torch.zeros_like(label))
+            cond_logits = self.model(x, t, cls=label)
+            logits= uncond_logits + (cond_logits-uncond_logits)*cfg_scale
+            return torch.softmax(logits, dim=-1)
         
 # Activation class
 class Swish(nn.Module):

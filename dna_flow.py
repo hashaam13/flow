@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader,Dataset
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,9 +45,25 @@ train_data = data['train_data']                          #numpy array (83726, 50
 y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
 
 seqs = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
-clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) #numpy array (83726)
+clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) + 1 #numpy array (83726)
 
-batch_size = 256
+class SequenceDataset(Dataset):
+    def __init__(self, sequences, labels):
+        self.sequences = sequences
+        self.labels = labels
+        
+    def __len__(self):
+        return len(self.sequences)
+    
+    def __getitem__(self, idx):
+        return self.sequences[idx], self.labels[idx]
+    
+def get_masked_classes(clss, cfg_drop_prob=0.1):
+    mask = torch.rand_like(clss.float()) > cfg_drop_prob  # 1=keep, 0=drop
+    return clss * mask.long()  # Keeps original class or sets to 0 (unconditional)
+
+dataset = SequenceDataset(seqs, clss) # create dataset
+batch_size = 2048
 vocab_size = 4
 epsilon = 1e-3
 hidden_dim=64
@@ -67,15 +83,15 @@ loss_fn = MixturePathGeneralizedKL(path=path)
 
 #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
 #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
-#probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0).to(device)
-probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
+probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0.1,num_classes=81).to(device)
+#probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
 if torch.cuda.device_count() > 1:
     print(f"Using {torch.cuda.device_count()} GPUs!")
     probability_denoiser = DataParallel(probability_denoiser, device_ids=[0,1])
 optimizer=optim.Adam(probability_denoiser.parameters(),lr=lr)
 
 dataloader = DataLoader(
-    dataset=seqs,
+    dataset=dataset,
     batch_size=batch_size,
     shuffle=True,
     num_workers=1
@@ -94,16 +110,17 @@ for epoch in range(epochs):
     epoch_loss = 0.0
     probability_denoiser.train()
     
-    for i, data in enumerate(dataloader):
+    for i, (data,y) in enumerate(dataloader):
         n_iter +=1
         optimizer.zero_grad()
         
         x_1 = data.to(device)
+        y = get_masked_classes(clss=y).to(device)
         x_0 = torch.randint_like(x_1, high=vocab_size, device=device)
         t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)
         
         path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
-        logits = probability_denoiser(x_t=path_sample.x_t, time=path_sample.t)
+        logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t, cls=y)
         loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.t)
         
         # if clip_grad:
