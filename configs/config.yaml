@@ -1,6 +1,6 @@
 defaults:
-  - model: cnn
-  - dataset: deepflybrain
+  - override model: cnn
+  - override dataset: deepflybrain
 
 # Training settings
 train:
