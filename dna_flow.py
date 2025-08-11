@@ -38,15 +38,16 @@ def main(cfg, DictConfig):
     else:
         device='cpu'
         print("using cpu")
-
-    torch.manual_seed(42)
-    np.random.seed(42)
+    model_cfg = cfg.models[cfg.model_name]
+    dataset_cfg = cfg.datasets[cfg.dataset_name]
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
     save_dir = "/home/hmuhammad/flow/data"
 
 
     # Load vocabulary (with full path)
     # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
-    with open(f"{save_dir}/DeepFlyBrain_data.pkl", "rb") as f:            
+    with open(dataset_cfg.path, "rb") as f:            
         data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
     train_data = data['train_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
     y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
@@ -70,8 +71,8 @@ def main(cfg, DictConfig):
         return clss * mask.long()  # Keeps original class or sets to 0 (unconditional)
 
     dataset = SequenceDataset(seqs, clss) # create dataset
-    batch_size = 2048
-    vocab_size = 4
+    batch_size = cfg.train.batch_size
+    vocab_size = model_cfg.vocab_size
     epsilon = 1e-3
     hidden_dim=64
     seq_length=500
@@ -90,7 +91,10 @@ def main(cfg, DictConfig):
 
     #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
     #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
-    probability_denoiser = CNNModel(vocab_size = vocab_size, hidden_dim=128, num_cnn_stacks=4,p_dropout=0.1,num_classes=81).to(device)
+    if model_cfg.name == "CNN":
+        probability_denoiser = CNNModel(vocab_size=model_cfg.vocab_size,hidden_dim=model_cfg.hidden_dim,num_cnn_stacks=model_cfg.num_cnn_stacks,p_dropout=model_cfg.p_dropout,num_classes=model_cfg.num_classes).to(device)
+    if model_cfg.name == "Transformer":
+        probability_denoiser = Transformer(vocab_size=model_cfg.vocab_size,masked=model_cfg.masked,hidden_size=model_cfg.hidden_dim,dropout=model_cfg.p_dropout,n_blocks=model_cfg.n_blocks,cond_dim=model_cfg.cond_dim,n_heads=model_cfg.n_heads).to(device)
     #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs!")
