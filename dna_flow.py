@@ -12,7 +12,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader,Dataset
 import math
-import matplotlib.pyplot as plt
 import numpy as np
 from models import MLP1,TransformerDenoiser
 from dna_model import CNNModel
