@@ -1,0 +1,17 @@
+cnn:
+  name: "CNN"
+  vocab_size: 4
+  hidden_dim: 128
+  num_cnn_stacks: 4
+  p_dropout: 0.1
+  num_classes: 81
+
+transformer:
+  name: "Transformer"
+  vocab_size: 4
+  masked: false
+  hidden_size: 128
+  dropout: 0.1
+  n_blocks: 8
+  cond_dim: 128
+  n_heads: 8
