@@ -1,0 +1,4 @@
+name: "DeepMEL2"
+path: "/home/hmuhammad/flow/data/DeepMEL2_data.pkl"
+num_classes: 47
+seq_length: 500

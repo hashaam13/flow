@@ -1,0 +1,4 @@
+name: "DeepFlyBrain"
+path: "/home/hmuhammad/flow/data/DeepFlyBrain_data.pkl"
+num_classes: 81
+seq_length: 500

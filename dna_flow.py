@@ -30,7 +30,7 @@ from flow_matching.loss import MixturePathGeneralizedKL
 from torch.nn.parallel import DataParallel
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
-def main(cfg, DictConfig):
+def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
     if torch.cuda.is_available():
         device='cuda:0'
@@ -38,16 +38,14 @@ def main(cfg, DictConfig):
     else:
         device='cpu'
         print("using cpu")
-    model_cfg = cfg.models[cfg.model_name]
-    dataset_cfg = cfg.datasets[cfg.dataset_name]
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
-    save_dir = "/home/hmuhammad/flow/data"
+    save_dir = cfg.train.save_dir
 
 
     # Load vocabulary (with full path)
     # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
-    with open(dataset_cfg.path, "rb") as f:            
+    with open(cfg.dataset.path, "rb") as f:            
         data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
     train_data = data['train_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
     y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
@@ -72,15 +70,12 @@ def main(cfg, DictConfig):
 
     dataset = SequenceDataset(seqs, clss) # create dataset
     batch_size = cfg.train.batch_size
-    vocab_size = model_cfg.vocab_size
-    epsilon = 1e-3
-    hidden_dim=64
-    seq_length=500
-    lr=0.0005 # 5e-4
-    epochs=220 # 918 for flybrain,1084 for deeplMEL2
-    n_iters=300000
-    warmup=500
-    clip_grad = True
+    epsilon = cfg.epsilon
+    seq_length=cfg.dataset.seq_length
+    lr=cfg.train.lr # 5e-4
+    epochs=cfg.train.epochs # 918 for flybrain,1084 for deeplMEL2
+    warmup=cfg.train.warmup
+    clip_grad = cfg.train.clip_grad
 
     # instantiate a convex path object
     scheduler = PolynomialConvexScheduler(n=2)
@@ -91,10 +86,10 @@ def main(cfg, DictConfig):
 
     #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
     #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
-    if model_cfg.name == "CNN":
-        probability_denoiser = CNNModel(vocab_size=model_cfg.vocab_size,hidden_dim=model_cfg.hidden_dim,num_cnn_stacks=model_cfg.num_cnn_stacks,p_dropout=model_cfg.p_dropout,num_classes=model_cfg.num_classes).to(device)
-    if model_cfg.name == "Transformer":
-        probability_denoiser = Transformer(vocab_size=model_cfg.vocab_size,masked=model_cfg.masked,hidden_size=model_cfg.hidden_dim,dropout=model_cfg.p_dropout,n_blocks=model_cfg.n_blocks,cond_dim=model_cfg.cond_dim,n_heads=model_cfg.n_heads).to(device)
+    if cfg.model.name == "CNN":
+        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.model.num_classes).to(device)
+    if cfg.model.name == "Transformer":
+        probability_denoiser = Transformer(vocab_size=cfg.model.vocab_size,masked=cfg.model.masked,hidden_size=cfg.model.hidden_dim,dropout=cfg.model.p_dropout,n_blocks=cfg.model.n_blocks,cond_dim=cfg.model.cond_dim,n_heads=cfg.model.n_heads).to(device)
     #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs!")
@@ -108,7 +103,7 @@ def main(cfg, DictConfig):
         num_workers=1
         )
     # 1. Setup plot directory
-    plot_dir = "/home/hmuhammad/flow/plots"
+    plot_dir = cfg.train.plot_dir
     os.makedirs(plot_dir, exist_ok=True)  # Create if doesn't exist
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -127,7 +122,7 @@ def main(cfg, DictConfig):
             
             x_1 = data.to(device)
             y = get_masked_classes(clss=y).to(device)
-            x_0 = torch.randint_like(x_1, high=vocab_size, device=device)
+            x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
             t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)
             
             path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
@@ -194,3 +189,7 @@ def main(cfg, DictConfig):
 
     print(f"\nTraining complete! All plots saved to {plot_dir}")
     print(f"Final loss curve: {final_plot_path}")
+
+if __name__ == "__main__":
+    main()
+

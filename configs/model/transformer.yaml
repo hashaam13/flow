@@ -1,0 +1,8 @@
+name: "Transformer"
+vocab_size: 4
+masked: false
+hidden_size: 128
+dropout: 0.1
+n_blocks: 8
+cond_dim: 128
+n_heads: 8

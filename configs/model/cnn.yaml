@@ -1,0 +1,6 @@
+name: "CNN"
+vocab_size: 4
+hidden_dim: 128
+num_cnn_stacks: 4
+p_dropout: 0.1
+num_classes: 81
