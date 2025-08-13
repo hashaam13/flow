@@ -64,7 +64,7 @@ def main(cfg: DictConfig):
         def __getitem__(self, idx):
             return self.sequences[idx], self.labels[idx]
         
-    def get_masked_classes(clss, cfg_drop_prob=0.1):
+    def get_masked_classes(clss, cfg_drop_prob=0.3):
         mask = torch.rand_like(clss.float()) > cfg_drop_prob  # 1=keep, 0=drop
         return clss * mask.long()  # Keeps original class or sets to 0 (unconditional)
 
@@ -121,7 +121,7 @@ def main(cfg: DictConfig):
             optimizer.zero_grad()
             
             x_1 = data.to(device)
-            y = get_masked_classes(clss=y).to(device)
+            y = get_masked_classes(clss=y,cfg_drop_prob=0.3).to(device) # no class with probability 0.3, same as dirichlet flow0..00208 matching
             x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
             t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)
             

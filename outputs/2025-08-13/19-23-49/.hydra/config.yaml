@@ -1,0 +1,23 @@
+model:
+  name: CNN
+  vocab_size: 4
+  hidden_dim: 128
+  num_cnn_stacks: 4
+  p_dropout: 0.1
+  num_classes: 81
+dataset:
+  name: DeepFlyBrain
+  path: /home/hmuhammad/flow/data/DeepFlyBrain_data.pkl
+  num_classes: 81
+  seq_length: 500
+train:
+  batch_size: 256
+  lr: 0.0005
+  epochs: 220
+  warmup: 500
+  clip_grad: true
+  save_dir: /home/hmuhammad/flow/data
+  plot_dir: /home/hmuhammad/flow/plots
+device: cuda:0
+seed: 42
+epsilon: 0.001

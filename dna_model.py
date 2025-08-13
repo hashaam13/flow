@@ -52,8 +52,6 @@ class CNNModel(nn.Module):
         num_cnn_stacks = num_cnn_stacks
         p_dropout = p_dropout
         self.clean_data = False
-        self.cls_free_guidance = False
-        self.classifier= False
         if self.clean_data:
             self.linear = nn.Embedding(
                 self.alphabet_size, embedding_dim=hidden_dim
