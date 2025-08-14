@@ -129,14 +129,13 @@ def main(cfg: DictConfig):
             logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t, cls=y)
             loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.t)
             
-            # if clip_grad:
-            #     torch.nn.utils.clip_grad_norm_(probability_denoiser.parameters(), 1.0)
-            # if warmup > 0:
-            #     for g in optimizer.param_groups:
-            #         g["lr"] = lr * np.minimum(n_iter / warmup, 1.0)
-
+            if warmup > 0:
+                 for g in optimizer.param_groups:
+                     g["lr"] = lr * np.minimum(n_iter / warmup, 1.0)
 
             loss.backward()
+            if clip_grad:
+                torch.nn.utils.clip_grad_norm_(probability_denoiser.parameters(), 1.0)
             optimizer.step()
             epoch_loss += loss.item()
 

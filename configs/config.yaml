@@ -4,9 +4,9 @@ defaults:
 
 # Training settings
 train:
-  batch_size: 256
+  batch_size: 2048
   lr: 5e-4
-  epochs: 220
+  epochs: 950
   warmup: 500
   clip_grad: true
   save_dir: "/home/hmuhammad/flow/data"

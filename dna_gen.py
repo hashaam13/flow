@@ -42,7 +42,7 @@ path = MixtureDiscreteProbPath(scheduler=scheduler)
 vocab_size = 4   
 seq_length=500
     
-checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_60.pth"
+checkpoint_path = "/home/hmuhammad/flow/checkpoints/model_epoch_950.pth"
 checkpoint = torch.load(checkpoint_path, map_location=torch.device(device),weights_only=False)
 
 # 2. Initialize your model architecture first (must match original)
@@ -58,16 +58,16 @@ probability_denoiser.eval()  # Set to evaluation mode
 
 wrapped_probability_denoiser = WrappedModel(probability_denoiser)
 solver = MixtureDiscreteEulerSolver(model=wrapped_probability_denoiser, path=path, vocabulary_size=vocab_size)
-nfe = 64
+nfe = 128
 step_size = 1 / nfe
 
 safe_sampling = True
-n_samples = 3
+n_samples = 1000
 dim = seq_length
 epsilon=1e-3
 
 x_init = torch.randint(size=(n_samples, dim), high=vocab_size, device=device)
-y = torch.LongTensor([1,2,3])
+y = torch.ones(1000,dtype=int,device=device)
 n_plots = 9
 linspace_to_plot = torch.linspace(0,  1 - epsilon, n_plots)
 
@@ -79,7 +79,8 @@ sol = solver.sample(x_init=x_init,
                     label=y,
                     cfg_scale=3)
 print(sol.shape) # [sampling_steps, n_samples, seq_length]
-
+final_seqs=sol[-1].cpu().numpy()
+np.save("output_samples/fb_class1.npy",final_seqs)
 # Assuming sol is your tensor with shape [9, 2, 500]
 last_generation = sol[-1, 2]  # Gets last timestep (-1), first sample (0)
 last_generation = last_generation.cpu().numpy()
