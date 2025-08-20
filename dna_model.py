@@ -42,16 +42,16 @@ class Dense(nn.Module):
 
 
 class CNNModel(nn.Module):
-    def __init__(self, vocab_size, hidden_dim, num_cnn_stacks,p_dropout,num_classes):
+    def __init__(self, vocab_size, hidden_dim, num_cnn_stacks,p_dropout,num_classes,classifier=False,clean_data=False):
         super().__init__()
         self.alphabet_size = vocab_size
         self.num_cls = num_classes
-        self.classifier = False
+        self.classifier = classifier
         self.cls_free_guidance = True
         hidden_dim = hidden_dim
         num_cnn_stacks = num_cnn_stacks
         p_dropout = p_dropout
-        self.clean_data = False
+        self.clean_data = clean_data
         if self.clean_data:
             self.linear = nn.Embedding(
                 self.alphabet_size, embedding_dim=hidden_dim
@@ -112,7 +112,7 @@ class CNNModel(nn.Module):
                 [Dense(hidden_dim, hidden_dim) for _ in range(self.num_layers)]
             )
 
-    def forward(self, x, t, cls, return_embedding=False):
+    def forward(self, x, t=None, cls=None, return_embedding=False):
         """
         Args:
             batch_data(dict):

@@ -58,7 +58,7 @@ probability_denoiser.eval()  # Set to evaluation mode
 
 wrapped_probability_denoiser = WrappedModel(probability_denoiser)
 solver = MixtureDiscreteEulerSolver(model=wrapped_probability_denoiser, path=path, vocabulary_size=vocab_size)
-nfe = 128
+nfe = 1024
 step_size = 1 / nfe
 
 safe_sampling = True
