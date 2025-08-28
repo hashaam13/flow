@@ -4,3 +4,4 @@ __pycache__/
 checkpoints/
 plots/
 output_samples/
+outputs/

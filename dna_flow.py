@@ -50,6 +50,10 @@ def main(cfg: DictConfig):
     train_data = data['train_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
     y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
 
+    test_data = data['test_data']
+    #print(test_data[0])
+
+
     seqs = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
     clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) + 1 #numpy array (83726)
 

@@ -31,10 +31,11 @@ class0_indices = torch.where(clss == 0)[0]
 
 # Randomly choose 1000 of them
 #selected_indices = class0_indices[torch.randperm(len(class0_indices))[:1000]]
-selected_indices = class0_indices[:1000]
+selected_indices = class0_indices[:]
 
 # Select the sequences
-real_seqs = seqs1[selected_indices]
+real_seqs = seqs1[selected_indices].to(device)
+#real_seqs = seqs1.to(device)
 #selected_indices = class0_indices[1000:2000]
 #gen_seqs = seqs1[selected_indices]
                   
@@ -48,9 +49,10 @@ for k, v in cls_ckpt["state_dict"].items():
     state_dict[new_k] = v
 
 cls_clean_model.load_state_dict(state_dict)
-logits=cls_clean_model(real_seqs)
-real_embs=cls_clean_model(real_seqs,return_embedding=True)[1]
-gen_embs=cls_clean_model(gen_seqs,return_embedding=True)[1]
+#logits=cls_clean_model(real_seqs)
+with torch.no_grad():
+    real_embs=cls_clean_model(real_seqs,return_embedding=True)[1]
+    gen_embs=cls_clean_model(gen_seqs,return_embedding=True)[1]
 
 def sqrtm_torch(mat, eps=1e-6):
     """Matrix square root using eigen decomposition (Torch only)."""
@@ -90,6 +92,6 @@ fid_score = compute_fid_torch(real_embs, gen_embs)
 print("FID:", fid_score.item())
 print("embedding shape",real_embs.shape)
 
-pred_class=torch.argmax(logits,dim=1)
-ones= (pred_class==0).sum().item()
-print(ones)
+#pred_class=torch.argmax(logits,dim=1)
+#ones= (pred_class==0).sum().item()
+#print(ones)
