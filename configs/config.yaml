@@ -4,9 +4,9 @@ defaults:
 
 # Training settings
 train:
-  batch_size: 2048
+  batch_size: 512
   lr: 5e-4
-  epochs: 950
+  epochs: 1400
   warmup: 500
   clip_grad: true
   save_dir: "/home/hmuhammad/flow/data"
@@ -16,3 +16,4 @@ train:
 device: "cuda:0"
 seed: 42
 epsilon: 1e-3
+source_distribution: "mask"

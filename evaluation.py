@@ -15,15 +15,15 @@ if torch.cuda.is_available():
 else:
     device='cpu'
     print("using cpu")
-seqs = np.load("output_samples/fb_class1.npy")
+seqs = np.load("output_samples/fb_class1_masked.npy")
 gen_seqs=torch.from_numpy(copy.deepcopy(seqs)).to(device)
 
 
     # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
 with open("/home/hmuhammad/flow/data/DeepFlyBrain_data.pkl", "rb") as f:            
     data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
-    train_data = data['train_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
-    y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
+    train_data = data['test_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
+    y_train = data['y_test']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
 
 seqs1 = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
 clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) #numpy array (83726)

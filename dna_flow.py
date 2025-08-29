@@ -88,10 +88,22 @@ def main(cfg: DictConfig):
     #loss function
     loss_fn = MixturePathGeneralizedKL(path=path)
 
+
+    if cfg.source_distribution == "uniform":
+        added_token = 0
+    elif cfg.source_distribution == "mask":
+        mask_token = cfg.model.vocab_size  # tokens starting from zero
+        added_token = 1
+    else:
+        raise NotImplementedError
+        
+    # additional mask token
+    cfg.model.vocab_size += added_token
+
     #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
     #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
     if cfg.model.name == "CNN":
-        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.model.num_classes).to(device)
+        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.dataset.num_classes).to(device)
     if cfg.model.name == "Transformer":
         probability_denoiser = Transformer(vocab_size=cfg.model.vocab_size,masked=cfg.model.masked,hidden_size=cfg.model.hidden_dim,dropout=cfg.model.p_dropout,n_blocks=cfg.model.n_blocks,cond_dim=cfg.model.cond_dim,n_heads=cfg.model.n_heads).to(device)
     #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
@@ -126,9 +138,11 @@ def main(cfg: DictConfig):
             
             x_1 = data.to(device)
             y = get_masked_classes(clss=y,cfg_drop_prob=0.3).to(device) # no class with probability 0.3, same as dirichlet flow0..00208 matching
-            x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
-            t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)
-            
+            if cfg.source_distribution == "uniform":
+                x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
+            elif cfg.source_distribution == "mask":
+                x_0 = torch.zeros_like(x_1) + mask_token              
+            t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)            
             path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
             logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t, cls=y)
             loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.t)
@@ -153,7 +167,7 @@ def main(cfg: DictConfig):
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}, Time: {time.time()-start_time:.2f}s')
         
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
-            checkpoint_path = f'checkpoints/model_epoch_{epoch+1}.pth'
+            checkpoint_path = f'checkpoints/cnn_masked_epoch_{epoch+1}.pth'
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': probability_denoiser.state_dict(),
