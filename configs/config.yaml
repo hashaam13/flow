@@ -11,9 +11,10 @@ train:
   clip_grad: true
   save_dir: "/home/hmuhammad/flow/data"
   plot_dir: "/home/hmuhammad/flow/plots"
+  classifier_free_guidance: false
 
 # General settings
 device: "cuda:0"
 seed: 42
 epsilon: 1e-3
-source_distribution: "mask"
+source_distribution: "mask"  # "mask or uniform"

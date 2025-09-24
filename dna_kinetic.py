@@ -28,6 +28,7 @@ from flow_matching.solver import MixtureDiscreteEulerSolver
 from flow_matching.utils import ModelWrapper
 from flow_matching.loss import MixturePathGeneralizedKL
 from torch.nn.parallel import DataParallel
+from kinetic_path import KineticOptimalProbPath
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def main(cfg: DictConfig):
@@ -42,6 +43,16 @@ def main(cfg: DictConfig):
     np.random.seed(cfg.seed)
     save_dir = cfg.train.save_dir
 
+    def compute_position_priors(train_onehot, eps=1e-8):
+
+        if isinstance(train_onehot, np.ndarray):
+            arr = torch.from_numpy(train_onehot)
+        else:
+            arr = train_onehot
+        counts = arr.sum(dim=0).float()  # (L, K)
+        pi = counts / (counts.sum(dim=-1, keepdim=True) + eps)
+        return pi.clamp(min=eps)
+
 
     # Load vocabulary (with full path)
     # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
@@ -52,6 +63,7 @@ def main(cfg: DictConfig):
 
     test_data = data['test_data']
     #print(test_data[0])
+    position_priors = compute_position_priors(train_data) 
 
 
     seqs = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
@@ -83,7 +95,7 @@ def main(cfg: DictConfig):
 
     # instantiate a convex path object
     scheduler = PolynomialConvexScheduler(n=2)
-    path = MixtureDiscreteProbPath(scheduler=scheduler)
+    path = KineticOptimalProbPath(scheduler=scheduler, position_priors=position_priors, min_scale=0.2, max_scale=1.0)
 
     #loss function
     loss_fn = MixturePathGeneralizedKL(path=path)
@@ -104,7 +116,7 @@ def main(cfg: DictConfig):
     #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
     #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
     if cfg.model.name == "CNN":
-        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.dataset.num_classes,cls_free_guidance=cfg.train.classifier_free_guidance).to(device)
+        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.dataset.num_classes).to(device)
     if cfg.model.name == "Transformer":
         probability_denoiser = Transformer(vocab_size=cfg.model.vocab_size,masked=cfg.model.masked,hidden_size=cfg.model.hidden_dim,dropout=cfg.model.p_dropout,n_blocks=cfg.model.n_blocks,cond_dim=cfg.model.cond_dim,n_heads=cfg.model.n_heads).to(device)
     #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
@@ -139,8 +151,7 @@ def main(cfg: DictConfig):
             optimizer.zero_grad()
             
             x_1 = data.to(device)
-            if cfg.train.classifier_free_guidance:
-                y = get_masked_classes(clss=y,cfg_drop_prob=0.3).to(device) # no class with probability 0.3, same as dirichlet flow0..00208 matching
+            y = get_masked_classes(clss=y,cfg_drop_prob=0.3).to(device) # no class with probability 0.3, same as dirichlet flow0..00208 matching
             if cfg.source_distribution == "uniform":
                 x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
             elif cfg.source_distribution == "mask":
@@ -170,7 +181,7 @@ def main(cfg: DictConfig):
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}, Time: {time.time()-start_time:.2f}s')
         
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
-            checkpoint_path = f'checkpoints/uncond_masked_model_epoch_{epoch+1}.pth'
+            checkpoint_path = f'checkpoints/kinetic_uniform_epoch_{epoch+1}.pth'
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': probability_denoiser.state_dict(),
@@ -212,4 +223,3 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
-

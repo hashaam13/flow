@@ -42,12 +42,12 @@ class Dense(nn.Module):
 
 
 class CNNModel(nn.Module):
-    def __init__(self, vocab_size, hidden_dim, num_cnn_stacks,p_dropout,num_classes,classifier=False,clean_data=False):
+    def __init__(self, vocab_size, hidden_dim, num_cnn_stacks,p_dropout,num_classes,classifier=False,clean_data=False,cls_free_guidance=False):
         super().__init__()
         self.alphabet_size = vocab_size
         self.num_cls = num_classes
         self.classifier = classifier
-        self.cls_free_guidance = True
+        self.cls_free_guidance = cls_free_guidance
         hidden_dim = hidden_dim
         num_cnn_stacks = num_cnn_stacks
         p_dropout = p_dropout

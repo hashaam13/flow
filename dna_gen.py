@@ -56,7 +56,7 @@ def main(cfg: DictConfig):
     cfg.model.vocab_size += added_token
     seq_length=cfg.dataset.seq_length 
         
-    checkpoint_path = "/home/hmuhammad/flow/checkpoints/cnn_masked_epoch_680.pth"
+    checkpoint_path = "/home/hmuhammad/flow/checkpoints/uncond_masked_model_epoch_920.pth"
     checkpoint = torch.load(checkpoint_path, map_location=torch.device(device),weights_only=False)
 
     # 2. Initialize your model architecture first (must match original)
@@ -65,7 +65,7 @@ def main(cfg: DictConfig):
     #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
 
     if cfg.model.name == "CNN":
-        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=0,num_classes=cfg.dataset.num_classes).to(device)
+        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=0,num_classes=cfg.dataset.num_classes,cls_free_guidance=cfg.train.classifier_free_guidance).to(device)
     if cfg.model.name == "Transformer":
         probability_denoiser = Transformer(vocab_size=cfg.model.vocab_size,masked=cfg.model.masked,hidden_size=cfg.model.hidden_dim,dropout=cfg.model.p_dropout,n_blocks=cfg.model.n_blocks,cond_dim=cfg.model.cond_dim,n_heads=cfg.model.n_heads).to(device)
     #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
@@ -103,7 +103,7 @@ def main(cfg: DictConfig):
                         cfg_scale=3)
     print(sol.shape) # [sampling_steps, n_samples, seq_length]
     final_seqs=sol[-1].cpu().numpy()
-    np.save("output_samples/fb_class1_masked.npy",final_seqs)
+    np.save("output_samples/fb_uncond_masked_1060_256.npy",final_seqs)
     # Assuming sol is your tensor with shape [9, 2, 500]
     last_generation = sol[-1, 2]  # Gets last timestep (-1), first sample (0)
     last_generation = last_generation.cpu().numpy()
