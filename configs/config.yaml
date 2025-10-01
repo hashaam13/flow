@@ -1,12 +1,12 @@
 defaults:
   - model: cnn
-  - dataset: deepflybrain
+  - dataset: deepflybrain   # deepflybrain or deepmel2
 
 # Training settings
 train:
   batch_size: 512
   lr: 5e-4
-  epochs: 1400
+  epochs: 2000
   warmup: 500
   clip_grad: true
   save_dir: "/home/hmuhammad/flow/data"

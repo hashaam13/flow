@@ -171,7 +171,7 @@ def main(cfg: DictConfig):
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}, Time: {time.time()-start_time:.2f}s')
         
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
-            checkpoint_path = f'checkpoints/uncond_masked_flybrain_epoch_{epoch+1}.pth'
+            checkpoint_path = f'checkpoints/uncond_masked_deepmel_epoch_{epoch+1}.pth'
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': probability_denoiser.state_dict(),
@@ -213,4 +213,3 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
-

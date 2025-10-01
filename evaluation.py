@@ -15,7 +15,7 @@ if torch.cuda.is_available():
 else:
     device='cpu'
     print("using cpu")
-seqs = np.load("output_samples/fb_uncond_masked_1060_256.npy")
+seqs = np.load("output_samples/fb_uncond_masked_deepmel_1450_128.npy") #[n_samples, seq_length]
 gen_seqs=torch.from_numpy(copy.deepcopy(seqs)).to(device)
 
 mask_token = 4   # assuming A,C,G,T = 0,1,2,3 and MASK=4
@@ -23,10 +23,10 @@ vocab_size = 4   # classifier expects only 4 bases
 mask_positions = (gen_seqs == mask_token)
 gen_seqs[mask_positions] = torch.randint(low=0, high=vocab_size, size=(mask_positions.sum().item(),)).to(device)
     # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
-with open("/home/hmuhammad/flow/data/DeepFlyBrain_data.pkl", "rb") as f:            
+with open("/home/hmuhammad/flow/data/DeepMEL2_data.pkl", "rb") as f:            
     data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
-    train_data = data['train_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
-    y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
+    train_data = data['valid_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
+    y_train = data['y_valid']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
 
 seqs1 = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
 clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) #numpy array (83726)
@@ -95,7 +95,7 @@ def compute_fid_torch(real_embs, gen_embs, eps=1e-6):
 
 # Example:
 fid_score = compute_fid_torch(real_embs, gen_embs)
-print("FID:", fid_score.item())
+print(fid_score.item())
 #print("embedding shape",real_embs.shape)
 
 #pred_class=torch.argmax(logits,dim=1)
