@@ -13,14 +13,12 @@ import torch.optim as optim
 from torch.utils.data import DataLoader,Dataset
 import math
 import numpy as np
-from models import MLP1,TransformerDenoiser
-from dna_model import CNNModel
-from model import Transformer
+from promoter_model import PromoterModel
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
 
-
+from utils.promoter_dataset import PromoterDataset 
 # flow_matching
 from flow_matching.path import MixtureDiscreteProbPath
 from flow_matching.path.scheduler import PolynomialConvexScheduler
@@ -43,40 +41,17 @@ def main(cfg: DictConfig):
     save_dir = cfg.train.save_dir
 
 
-    # Load vocabulary (with full path)
-    # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
-    with open(cfg.dataset.path, "rb") as f:            
-        data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
-    train_data = data['train_data']
-    print(train_data.shape)                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
-    y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
+    train_ds = PromoterDataset(split="train", n_tsses=100000, rand_offset=10) #pytorch dataset object 88570 sequences
+    val_ds = PromoterDataset(split="test", n_tsses=100000, rand_offset=0)
+    
+    print("Len train_ds: ", len(train_ds))
+    print("Len val_ds: ", len(val_ds))
 
-    test_data = data['test_data']
-    #print(test_data[0])
+    train_loader = DataLoader(train_ds, batch_size=cfg.train.batch_size, shuffle=True, num_workers=1)
+    val_loader = DataLoader(val_ds, batch_size=cfg.train.batch_size, shuffle=False, num_workers=1)
 
-
-    seqs = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
-    clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) + 1 #numpy array (83726)
-
-    class SequenceDataset(Dataset):
-        def __init__(self, sequences, labels):
-            self.sequences = sequences
-            self.labels = labels
-            
-        def __len__(self):
-            return len(self.sequences)
-        
-        def __getitem__(self, idx):
-            return self.sequences[idx], self.labels[idx]
-        
-    def get_masked_classes(clss, cfg_drop_prob=0.3):
-        mask = torch.rand_like(clss.float()) > cfg_drop_prob  # 1=keep, 0=drop
-        return clss * mask.long()  # Keeps original class or sets to 0 (unconditional)
-
-    dataset = SequenceDataset(seqs, clss) # create dataset
-    batch_size = cfg.train.batch_size
     epsilon = cfg.epsilon
-    seq_length=cfg.dataset.seq_length
+    seq_length=1024
     lr=cfg.train.lr # 5e-4
     epochs=cfg.train.epochs # 918 for flybrain,1084 for deeplMEL2
     warmup=cfg.train.warmup
@@ -101,26 +76,9 @@ def main(cfg: DictConfig):
         
     # additional mask token
     cfg.model.vocab_size += added_token
-
-    #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
-    #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
-    if cfg.model.name == "CNN":
-        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.dataset.num_classes,cls_free_guidance=cfg.train.classifier_free_guidance).to(device)
-    if cfg.model.name == "Transformer":
-        probability_denoiser = Transformer(vocab_size=cfg.model.vocab_size,masked=cfg.model.masked,hidden_size=cfg.model.hidden_dim,dropout=cfg.model.p_dropout,n_blocks=cfg.model.n_blocks,cond_dim=cfg.model.cond_dim,n_heads=cfg.model.n_heads).to(device)
-    #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
-    if torch.cuda.device_count() > 1:
-        print(f"Using {torch.cuda.device_count()} GPUs!")
-        probability_denoiser = DataParallel(probability_denoiser, device_ids=[0,1])
-    #optimizer=optim.Adam(probability_denoiser.parameters(),lr=lr)
+    probability_denoiser = PromoterModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.dataset.num_classes,cls_free_guidance=cfg.train.classifier_free_guidance).to(device)
     optimizer=optim.AdamW(probability_denoiser.parameters(),lr=lr)
 
-    dataloader = DataLoader(
-        dataset=dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=1
-        )
     # 1. Setup plot directory
     plot_dir = cfg.train.plot_dir
     os.makedirs(plot_dir, exist_ok=True)  # Create if doesn't exist
@@ -138,10 +96,7 @@ def main(cfg: DictConfig):
         for i, (data,y) in enumerate(dataloader):
             n_iter +=1
             optimizer.zero_grad()
-            
             x_1 = data.to(device)
-            if cfg.train.classifier_free_guidance:
-                y = get_masked_classes(clss=y,cfg_drop_prob=0.3).to(device) # no class with probability 0.3, same as dirichlet flow0..00208 matching
             if cfg.source_distribution == "uniform":
                 x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
             elif cfg.source_distribution == "mask":
