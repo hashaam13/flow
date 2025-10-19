@@ -141,7 +141,7 @@ def main(cfg: DictConfig):
             
             x_1 = data.to(device)
             if cfg.train.classifier_free_guidance:
-                y = get_masked_classes(clss=y,cfg_drop_prob=0.3).to(device) # no class with probability 0.3, same as dirichlet flow0..00208 matching
+                y = get_masked_classes(clss=y,cfg_drop_prob=0.3).to(device) # no class with probability 0.3, same as dirichlet flow
             if cfg.source_distribution == "uniform":
                 x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
             elif cfg.source_distribution == "mask":

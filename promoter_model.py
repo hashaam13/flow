@@ -1,6 +1,18 @@
 from torch import nn
 import torch
+import torch.nn.functional as F
 import numpy as np
+from torch.nn.modules import Module
+from flow_matching.path import AffineProbPath
+from flow_matching.path.scheduler import CondOTScheduler
+from flow_matching.solver import Solver, ODESolver
+from flow_matching.utils import ModelWrapper
+
+if torch.cuda.is_available():
+    device='cuda:0'
+else:
+    device='cpu'
+
 
 class GaussianFourierProjection(nn.Module):
     """
@@ -33,7 +45,7 @@ class Dense(nn.Module):
 class PromoterModel(nn.Module):
     """A time-dependent score-based model built upon U-Net architecture."""
 
-    def __init__(self, args, embed_dim=256, time_dependent_weights=None, time_step=0.01):
+    def __init__(self, vocab_size,embed_dim=256, time_dependent_weights=None, time_step=0.01):
         """Initialize a time-dependent score-based network.
 
         Args:
@@ -44,14 +56,11 @@ class PromoterModel(nn.Module):
         """
         super().__init__()
         # Gaussian random feature embedding layer for time
-        self.alphabet_size = 4
+        self.alphabet_size = vocab_size
         self.embed = nn.Sequential(GaussianFourierProjection(embed_dim=embed_dim),
                                    nn.Linear(embed_dim, embed_dim))
         n = 256
-        expanded_simplex_input = (args.mode == 'dirichlet' or args.mode == 'riemannian')
-        inp_size = self.alphabet_size * (2 if expanded_simplex_input else 1) + 1 # plus one for signal input
-        if (args.mode == 'ardm' or args.mode == 'lrar'):
-            inp_size += 1  # plus one for the mask token of these models
+        inp_size = self.alphabet_size + 1 # plus one for signal input
         self.linear = nn.Conv1d(inp_size, n, kernel_size=9, padding=4)
         self.blocks = nn.ModuleList([nn.Conv1d(n, n, kernel_size=9, padding=4),
                                      nn.Conv1d(n, n, kernel_size=9, padding=4),
@@ -84,13 +93,14 @@ class PromoterModel(nn.Module):
         self.scale = nn.Parameter(torch.ones(1))
         self.final = nn.Sequential(nn.Conv1d(n, n, kernel_size=1),
                                    nn.GELU(),
-                                   nn.Conv1d(n, 4, kernel_size=1))
+                                   nn.Conv1d(n, self.alphabet_size, kernel_size=1))
         self.register_buffer("time_dependent_weights", time_dependent_weights)
         self.time_step = time_step
 
     def forward(self, x, signal, t):
         # Obtain the Gaussian random feature embedding for t
         # embed: [N, embed_dim]
+        x = F.one_hot(x.long(), num_classes=self.alphabet_size).float() #(B,1024,5 if mask, 4 if uniform initial)
         embed = self.act(self.embed(t / 2))
 
         x = torch.cat([x,signal], dim=-1)
@@ -120,3 +130,12 @@ class PromoterModel(nn.Module):
 
         out = out - out.mean(axis=-1, keepdims=True)
         return out
+
+class WrappedModel(ModelWrapper):
+    def __init__(self, model: Module):
+        super().__init__(model)
+        self.nfe_counter = 0
+    def forward(self, x: torch.Tensor, t: torch.Tensor, label: torch.Tensor):
+        with torch.amp.autocast(device_type=device), torch.no_grad():
+            logits = self.model(x, signal=label,t=t)
+            return torch.softmax(logits, dim=-1)

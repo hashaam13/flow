@@ -4,7 +4,7 @@ defaults:
 
 # Training settings
 train:
-  batch_size: 512
+  batch_size: 256
   lr: 5e-4
   epochs: 2000
   warmup: 500

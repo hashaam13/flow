@@ -13,11 +13,18 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 import math
 import numpy as np
-from models import MLP1, TransformerDenoiser,WrappedModel
+from models import MLP1, TransformerDenoiser
+from promoter_model import WrappedModel
 from model import Transformer
 from dna_model import CNNModel
 import hydra
 from omegaconf import DictConfig, OmegaConf
+from utils.promoter_dataset import PromoterDataset 
+from selene_sdk.utils import NonStrandSpecific
+from promoter_model import PromoterModel
+from utils.sei import Sei
+from utils.esm import upgrade_state_dict
+import pandas as pd
 
 # flow_matching
 from flow_matching.path import MixtureDiscreteProbPath
@@ -37,9 +44,19 @@ def main(cfg: DictConfig):
         print("using cpu")
 
     torch.manual_seed(42)
+    def get_sei_profile(seq_one_hot,seifeatures,sei,device):
+        B, L, K = seq_one_hot.shape
+        sei_inp = torch.cat([torch.ones((B, 4, 1536), device=device) * 0.25,
+                             seq_one_hot.transpose(1, 2),
+                             torch.ones((B, 4, 1536), device=device) * 0.25], 2) # batchsize x 4 x 4,096
+        sei_out = sei(sei_inp).cpu().detach().numpy() # batchsize x 21,907
+        sei_out = sei_out[:,seifeatures[1].str.strip().values == 'H3K4me3'] # batchsize x 2,350
+        predh3k4me3 = sei_out.mean(axis=1) # batchsize
+        return predh3k4me3
 
     scheduler = PolynomialConvexScheduler(n=2)
     path = MixtureDiscreteProbPath(scheduler=scheduler)
+    seifeatures = pd.read_csv('data/promoter_design/target.sei.names', sep='|', header=None)
     #class WrappedModel(ModelWrapper):
     #    def forward(self, x: torch.Tensor, t: torch.Tensor, **extras):
     #        return torch.softmax(self.model(x, t), dim=-1)
@@ -54,43 +71,54 @@ def main(cfg: DictConfig):
         
     # additional mask token
     cfg.model.vocab_size += added_token
-    seq_length=cfg.dataset.seq_length 
+    seq_length=1024
         
-    checkpoint_path = "/home/hmuhammad/flow/checkpoints/uncond_masked_flybrain_epoch_1450.pth"
+    checkpoint_path = "/home/hmuhammad/flow/checkpoints/promoter_masked_epoch_200.pth"
     checkpoint = torch.load(checkpoint_path, map_location=torch.device(device),weights_only=False)
-
-    # 2. Initialize your model architecture first (must match original)
-    # Assuming you have a ProbabilityDenoiser class defined elsewhere
-    #probability_denoiser = MLP1(input_dim=vocab_size, time_dim=1, hidden_dim=hidden_dim, length=seq_length).to(device)
-    #probability_denoiser = TransformerDenoiser(vocab_size=vocab_size,seq_length=seq_length,d_model=256,nhead=8, num_layers=8).to(device)
-
-    if cfg.model.name == "CNN":
-        probability_denoiser = CNNModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=0,num_classes=cfg.dataset.num_classes,cls_free_guidance=cfg.train.classifier_free_guidance).to(device)
-    if cfg.model.name == "Transformer":
-        probability_denoiser = Transformer(vocab_size=cfg.model.vocab_size,masked=cfg.model.masked,hidden_size=cfg.model.hidden_dim,dropout=cfg.model.p_dropout,n_blocks=cfg.model.n_blocks,cond_dim=cfg.model.cond_dim,n_heads=cfg.model.n_heads).to(device)
-    #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
-    # 3. Load the state dict
-    #probability_denoiser = nn.DataParallel(probability_denoiser)
+    probability_denoiser = PromoterModel(vocab_size=cfg.model.vocab_size).to(device)
     probability_denoiser.load_state_dict(checkpoint['model_state_dict'])
     probability_denoiser.eval()  # Set to evaluation mode
-
     wrapped_probability_denoiser = WrappedModel(probability_denoiser)
     solver = MixtureDiscreteEulerSolver(model=wrapped_probability_denoiser, path=path, vocabulary_size=cfg.model.vocab_size)
-    nfe = 512
+
+    sei = NonStrandSpecific(Sei(4096, 21907))
+    sei.load_state_dict(upgrade_state_dict(
+        torch.load('data/promoter_design/best.sei.model.pth.tar', map_location='cpu')['state_dict'],
+        prefixes=['module.']))
+    sei.to(device)
+    generator = np.random.default_rng(seed=137)
+
+    nfe = 100
     step_size = 1 / nfe
 
     safe_sampling = True
-    n_samples = 10000
+    batch_size = 256
     dim = seq_length
     epsilon=1e-3
 
-    if cfg.source_distribution == "uniform":
-        x_init = torch.randint(size=(n_samples, dim), high=cfg.model.vocab_size, device=device)
-    elif cfg.source_distribution == "mask":
-        x_init = (torch.zeros(size=(n_samples, dim),device=device) + mask_token).long()  
+    test_ds = PromoterDataset(split="test", n_tsses=100000, rand_offset=0) #pytorch dataset object, 7497 sequences for test
+    test_loader = DataLoader(test_ds, batch_size=cfg.train.batch_size, shuffle=True, num_workers=4, pin_memory=True,persistent_workers=True,prefetch_factor=4)
+    for batch in test_loader:
+        seq_one_hot = batch[:,:,:4].to(device) #(B,1024,4)
+        seq = torch.argmax(seq_one_hot, dim=-1) # (B,1024)
+        signal = batch[:, :, 4:5]
+        sei_profile=get_sei_profile(seq_one_hot,seifeatures=seifeatures,sei=sei,device=device)
+        if cfg.source_distribution == "uniform":
+            x_init = torch.randint(size=(batch_size, dim), high=cfg.model.vocab_size, device=device)
+        elif cfg.source_distribution == "mask":
+            x_init = (torch.zeros(size=(batch_size, dim),device=device) + mask_token).long() 
+        sol = solver.sample(x_init=x_init,
+                    step_size=step_size,
+                    verbose=True,
+                    return_intermediates=True,
+                    time_grid=linspace_to_plot,
+                    label=signal)
+        seq_pred=sol[-1] # [n_samples, seq_length]
+        seq_pred_one_hot = torch.nn.functional.one_hot(seq_pred, num_classes=cfg.model.vocab_size).float()
+        sei_profile_pred = get_sei_profile(seq_pred_one_hot)
+        mse = (sei_profile - sei_profile_pred) ** 2
+        
 
-
-    y = torch.ones(n_samples,dtype=int,device=device) # labels, 0 is for null class
     n_plots = 9
     linspace_to_plot = torch.linspace(0,  1 - epsilon, n_plots)
 
@@ -103,7 +131,7 @@ def main(cfg: DictConfig):
                         cfg_scale=3)
     print(sol.shape) # [sampling_steps, n_samples, seq_length]
     final_seqs=sol[-1].cpu().numpy()
-    np.save("output_samples/fb_uncond_masked_flybrain_1450_512.npy",final_seqs)
+    np.save("output_samples/promoter_mask_200.npy",final_seqs)
     # Assuming sol is your tensor with shape [9, 2, 500]
     last_generation = sol[-1, 2]  # Gets last timestep (-1), first sample (0)
     last_generation = last_generation.cpu().numpy()

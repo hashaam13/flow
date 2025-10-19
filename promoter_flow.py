@@ -42,13 +42,13 @@ def main(cfg: DictConfig):
 
 
     train_ds = PromoterDataset(split="train", n_tsses=100000, rand_offset=10) #pytorch dataset object 88570 sequences
-    val_ds = PromoterDataset(split="test", n_tsses=100000, rand_offset=0)
+    #val_ds = PromoterDataset(split="test", n_tsses=100000, rand_offset=0)
     
     print("Len train_ds: ", len(train_ds))
-    print("Len val_ds: ", len(val_ds))
+    #print("Len val_ds: ", len(val_ds))
 
-    train_loader = DataLoader(train_ds, batch_size=cfg.train.batch_size, shuffle=True, num_workers=1)
-    val_loader = DataLoader(val_ds, batch_size=cfg.train.batch_size, shuffle=False, num_workers=1)
+    train_loader = DataLoader(train_ds, batch_size=cfg.train.batch_size, shuffle=True, num_workers=4, pin_memory=True,persistent_workers=True,prefetch_factor=4)
+    #val_loader = DataLoader(val_ds, batch_size=cfg.train.batch_size, shuffle=False, num_workers=1)
 
     epsilon = cfg.epsilon
     seq_length=1024
@@ -76,7 +76,7 @@ def main(cfg: DictConfig):
         
     # additional mask token
     cfg.model.vocab_size += added_token
-    probability_denoiser = PromoterModel(vocab_size=cfg.model.vocab_size,hidden_dim=cfg.model.hidden_dim,num_cnn_stacks=cfg.model.num_cnn_stacks,p_dropout=cfg.model.p_dropout,num_classes=cfg.dataset.num_classes,cls_free_guidance=cfg.train.classifier_free_guidance).to(device)
+    probability_denoiser = PromoterModel(vocab_size=cfg.model.vocab_size).to(device)
     optimizer=optim.AdamW(probability_denoiser.parameters(),lr=lr)
 
     # 1. Setup plot directory
@@ -93,17 +93,19 @@ def main(cfg: DictConfig):
         epoch_loss = 0.0
         probability_denoiser.train()
         
-        for i, (data,y) in enumerate(dataloader):
+        for i, batch in enumerate(train_loader): #(B,1024,6)
             n_iter +=1
             optimizer.zero_grad()
-            x_1 = data.to(device)
+            x_1 = batch[:,:,:4].to(device) #(B,1024,4)
+            x_1 = torch.argmax(x_1,-1).to(device) #(B,1024)
+            signal = batch[:,:,4:5].to(device) #(B,1024,1)
             if cfg.source_distribution == "uniform":
                 x_0 = torch.randint_like(x_1, high=cfg.model.vocab_size, device=device)
             elif cfg.source_distribution == "mask":
                 x_0 = torch.zeros_like(x_1) + mask_token              
             t = torch.rand(x_1.shape[0]).to(device) * (1 - epsilon)            
             path_sample = path.sample(t=t, x_0=x_0, x_1=x_1)
-            logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t, cls=y)
+            logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t, signal=signal)
             loss = loss_fn(logits=logits, x_1=x_1, x_t=path_sample.x_t, t=path_sample.t)
             
             if warmup > 0:
@@ -121,12 +123,12 @@ def main(cfg: DictConfig):
                 print(f"Epoch {epoch} | Batch {i} | Avg Loss: {epoch_loss/(i+1):.4f}")
 
         # Store epoch loss
-        avg_epoch_loss = epoch_loss / len(dataloader)
+        avg_epoch_loss = epoch_loss / len(train_loader)
         train_losses.append(avg_epoch_loss)
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}, Time: {time.time()-start_time:.2f}s')
         
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
-            checkpoint_path = f'checkpoints/uncond_masked_deepmel_epoch_{epoch+1}.pth'
+            checkpoint_path = f'checkpoints/promoter_masked_epoch_{epoch+1}.pth'
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': probability_denoiser.state_dict(),
