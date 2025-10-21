@@ -47,7 +47,7 @@ def main(cfg: DictConfig):
     print("Len train_ds: ", len(train_ds))
     #print("Len val_ds: ", len(val_ds))
 
-    train_loader = DataLoader(train_ds, batch_size=cfg.train.batch_size, shuffle=True, num_workers=4, pin_memory=True,persistent_workers=True,prefetch_factor=4)
+    train_loader = DataLoader(train_ds, batch_size=cfg.train.batch_size, shuffle=True, num_workers=16, pin_memory=True,persistent_workers=True,prefetch_factor=8)
     #val_loader = DataLoader(val_ds, batch_size=cfg.train.batch_size, shuffle=False, num_workers=1)
 
     epsilon = cfg.epsilon
