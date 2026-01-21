@@ -77,6 +77,13 @@ def main(cfg: DictConfig):
     # additional mask token
     cfg.model.vocab_size += added_token
     probability_denoiser = PromoterModel(vocab_size=cfg.model.vocab_size).to(device)
+
+    total_params = sum(p.numel() for p in probability_denoiser.parameters())
+    trainable_params = sum(p.numel() for p in probability_denoiser.parameters() if p.requires_grad)
+    print(probability_denoiser)
+    print(f"Total parameters: {total_params}")
+    print(f"Trainable parameters: {trainable_params}")
+
     optimizer=optim.AdamW(probability_denoiser.parameters(),lr=lr)
 
     # 1. Setup plot directory

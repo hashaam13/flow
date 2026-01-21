@@ -109,6 +109,12 @@ def main(cfg: DictConfig):
     if cfg.model.name == "Transformer":
         probability_denoiser = Transformer(vocab_size=cfg.model.vocab_size,masked=cfg.model.masked,hidden_size=cfg.model.hidden_dim,dropout=cfg.model.p_dropout,n_blocks=cfg.model.n_blocks,cond_dim=cfg.model.cond_dim,n_heads=cfg.model.n_heads).to(device)
     #probability_denoiser = Transformer(vocab_size=4,masked=False,hidden_size=128,dropout=0.1,n_blocks=8,cond_dim=128,n_heads=8).to(device)
+    total_params = sum(p.numel() for p in probability_denoiser.parameters())
+    trainable_params = sum(p.numel() for p in probability_denoiser.parameters() if p.requires_grad)
+    print(probability_denoiser)
+    print(f"Total parameters: {total_params}")
+    print(f"Trainable parameters: {trainable_params}")
+
     if torch.cuda.device_count() > 1:
         print(f"Using {torch.cuda.device_count()} GPUs!")
         probability_denoiser = DataParallel(probability_denoiser, device_ids=[0,1])
@@ -171,7 +177,7 @@ def main(cfg: DictConfig):
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_epoch_loss:.4f}, Time: {time.time()-start_time:.2f}s')
         
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
-            checkpoint_path = f'checkpoints/uncond_masked_flybrain_epoch_{epoch+1}.pth'
+            checkpoint_path = f'checkpoints/cond_masked_flybrain_epoch_{epoch+1}.pth'
             torch.save({
                 'epoch': epoch + 1,
                 'model_state_dict': probability_denoiser.state_dict(),

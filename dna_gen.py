@@ -1,4 +1,5 @@
 import torch
+import random
 import ml_collections
 import time
 import os
@@ -36,7 +37,16 @@ def main(cfg: DictConfig):
         device='cpu'
         print("using cpu")
 
-    torch.manual_seed(42)
+    def set_seed(seed):
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+
+        #torch.backends.cudnn.deterministic = True
+        #torch.backends.cudnn.benchmark = False        
+
+    set_seed(2)
 
     scheduler = PolynomialConvexScheduler(n=2)
     path = MixtureDiscreteProbPath(scheduler=scheduler)
@@ -56,7 +66,7 @@ def main(cfg: DictConfig):
     cfg.model.vocab_size += added_token
     seq_length=cfg.dataset.seq_length 
         
-    checkpoint_path = "/home/hmuhammad/flow/checkpoints/uncond_masked_flybrain_epoch_1450.pth"
+    checkpoint_path = "/home/hmuhammad/flow/checkpoints/cond_uniform_flybrain_epoch_2000.pth"
     checkpoint = torch.load(checkpoint_path, map_location=torch.device(device),weights_only=False)
 
     # 2. Initialize your model architecture first (must match original)
@@ -72,11 +82,12 @@ def main(cfg: DictConfig):
     # 3. Load the state dict
     #probability_denoiser = nn.DataParallel(probability_denoiser)
     probability_denoiser.load_state_dict(checkpoint['model_state_dict'])
+    print(probability_denoiser)
     probability_denoiser.eval()  # Set to evaluation mode
 
     wrapped_probability_denoiser = WrappedModel(probability_denoiser)
     solver = MixtureDiscreteEulerSolver(model=wrapped_probability_denoiser, path=path, vocabulary_size=cfg.model.vocab_size)
-    nfe = 512
+    nfe = 100
     step_size = 1 / nfe
 
     safe_sampling = True
@@ -90,7 +101,7 @@ def main(cfg: DictConfig):
         x_init = (torch.zeros(size=(n_samples, dim),device=device) + mask_token).long()  
 
 
-    y = torch.ones(n_samples,dtype=int,device=device) # labels, 0 is for null class
+    y = torch.ones(n_samples,dtype=int,device=device)*3 # labels, 0 is for null class
     n_plots = 9
     linspace_to_plot = torch.linspace(0,  1 - epsilon, n_plots)
 
@@ -103,7 +114,7 @@ def main(cfg: DictConfig):
                         cfg_scale=3)
     print(sol.shape) # [sampling_steps, n_samples, seq_length]
     final_seqs=sol[-1].cpu().numpy()
-    np.save("output_samples/fb_uncond_masked_flybrain_1450_512.npy",final_seqs)
+    np.save("output_samples/fb_cond_uniform_2000_100_class3_cfg3_mod.npy",final_seqs)
     # Assuming sol is your tensor with shape [9, 2, 500]
     last_generation = sol[-1, 2]  # Gets last timestep (-1), first sample (0)
     last_generation = last_generation.cpu().numpy()

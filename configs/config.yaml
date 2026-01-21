@@ -4,17 +4,17 @@ defaults:
 
 # Training settings
 train:
-  batch_size: 512
+  batch_size: 3000
   lr: 5e-4
   epochs: 2000
   warmup: 500
   clip_grad: true
   save_dir: "/home/hmuhammad/flow/data"
   plot_dir: "/home/hmuhammad/flow/plots"
-  classifier_free_guidance: false
+  classifier_free_guidance: true
 
 # General settings
 device: "cuda:0"
 seed: 42
 epsilon: 1e-3
-source_distribution: "mask"  # "mask or uniform"
+source_distribution: "uniform"  # "mask or uniform"

@@ -15,7 +15,8 @@ if torch.cuda.is_available():
 else:
     device='cpu'
     print("using cpu")
-seqs = np.load("output_samples/fb_uncond_masked_deepmel_1450_128.npy") #[n_samples, seq_length]
+seqs = np.load("output_samples/fb_cond_uniform_2000_100_class3_cfg3_mod.npy") #[n_samples, seq_length]
+print("generated data shape",seqs.shape)
 gen_seqs=torch.from_numpy(copy.deepcopy(seqs)).to(device)
 
 mask_token = 4   # assuming A,C,G,T = 0,1,2,3 and MASK=4
@@ -23,31 +24,39 @@ vocab_size = 4   # classifier expects only 4 bases
 mask_positions = (gen_seqs == mask_token)
 gen_seqs[mask_positions] = torch.randint(low=0, high=vocab_size, size=(mask_positions.sum().item(),)).to(device)
     # 2 enhancer datasets, DeepFlyBrain_data.pkl and DeepMEL2_data.pkl 
-with open("/home/hmuhammad/flow/data/DeepMEL2_data.pkl", "rb") as f:            
+with open("/home/hmuhammad/flow/data/DeepFlyBrain_data.pkl", "rb") as f:            
     data = pickle.load(f)                                #dict with keys:['train_data','y_train','valid_data','y_valid','test_data', 'y_test']
-    train_data = data['valid_data']                          #numpy array (83726, 500, 4) for DeepFlyBrain data, (70892, 500, 4) for DeepMEL2 data
-    y_train = data['y_valid']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
+    train_data = data['train_data']
+    print("real_data shape",train_data.shape)
+    y_train = data['y_train']                                #numpy array (83726, 81) for DeepFlyBrain data, (70892, 47) for DeepMEL2 data,
 
 seqs1 = torch.argmax(torch.from_numpy(copy.deepcopy(train_data)), dim=-1) #numpy array (83726, 500)
 clss = torch.argmax(torch.from_numpy(copy.deepcopy(y_train)), dim=-1 ) #numpy array (83726)
+print("label shape",clss.shape)
 total_sequences = len(seqs1)
-class0_indices = torch.where(clss == 0)[0]
+class_indices = torch.where(clss == 2)[0]
+print("chosen label shape",class_indices.shape)
 random_indices = torch.randperm(total_sequences)[:10000]
-random_seqs = seqs1[random_indices].to(device)
+#random_seqs = seqs1[random_indices].to(device)
 # Randomly choose 1000 of them
 #selected_indices = class0_indices[torch.randperm(len(class0_indices))[:1000]]
-selected_indices = class0_indices[:]
+selected_indices = class_indices[:]
 
 # Select the sequences
-real_seqs = seqs1[selected_indices].to(device)
+real_seqs = seqs1[selected_indices].to(device)      #for class specific selection
+#real_seqs = seqs1[random_indices].to(device)       #for random selection
+print(real_seqs.shape)
 #real_seqs = seqs1.to(device)
 #selected_indices = class0_indices[1000:2000]
 #gen_seqs = seqs1[selected_indices]
-                  
-cls_clean_model = CNNModel(vocab_size = 4, hidden_dim=128, num_cnn_stacks=1,p_dropout=0,num_classes=81,classifier=True,clean_data=True).to(device)
-#print(cls_clean_model)
-ckpt_path = "/home/hmuhammad/flow/checkpoints/classifiers//clsDNAclean_cnn_1stack_2023-12-30_15-01-30/epoch=15-step=10480.ckpt"
+cls_clean_model = CNNModel(vocab_size = 4, hidden_dim=128, num_cnn_stacks=1,p_dropout=0,num_classes=81,classifier=True,clean_data=True).to(device)   # for flybrain                
+#cls_clean_model = CNNModel(vocab_size = 4, hidden_dim=128, num_cnn_stacks=4,p_dropout=0.2,num_classes=47,classifier=True,clean_data=True).to(device)  # for Melanoma 
+#print(cls_clean_model) 
+ckpt_path = "/home/hmuhammad/flow/checkpoints/classifiers//clsDNAclean_cnn_1stack_2023-12-30_15-01-30/epoch=15-step=10480.ckpt" # for flybrain
+#ckpt_path = "/home/hmuhammad/flow/checkpoints/classifiers/clsMELclean_cnn_dropout02_2023-12-31_12-26-28/epoch=9-step=5540.ckpt"  # for melanoma
 cls_ckpt = torch.load(ckpt_path,map_location=torch.device(device),weights_only=False)
+#keys = cls_ckpt["state_dict"].keys()
+#print(sorted([k for k in keys]))
 state_dict = dict()
 for k, v in cls_ckpt["state_dict"].items():
     new_k = k[6:]
@@ -56,7 +65,7 @@ for k, v in cls_ckpt["state_dict"].items():
 cls_clean_model.load_state_dict(state_dict)
 #logits=cls_clean_model(real_seqs)
 with torch.no_grad():
-    real_embs=cls_clean_model(random_seqs,return_embedding=True)[1]
+    real_embs=cls_clean_model(real_seqs,return_embedding=True)[1]
     gen_embs=cls_clean_model(gen_seqs,return_embedding=True)[1]
     #print("real embeddings",real_embs.shape)
     #print("gen embeddings",gen_embs.shape)
