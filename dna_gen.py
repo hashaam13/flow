@@ -66,7 +66,7 @@ def main(cfg: DictConfig):
     cfg.model.vocab_size += added_token
     seq_length=cfg.dataset.seq_length 
         
-    checkpoint_path = "/home/hmuhammad/flow/checkpoints/cond_uniform_flybrain_epoch_2000.pth"
+    checkpoint_path = "/home/hmuhammad/flow/checkpoints/uncond_masked_deepmel_epoch_20.pth"
     checkpoint = torch.load(checkpoint_path, map_location=torch.device(device),weights_only=False)
 
     # 2. Initialize your model architecture first (must match original)
@@ -101,7 +101,7 @@ def main(cfg: DictConfig):
         x_init = (torch.zeros(size=(n_samples, dim),device=device) + mask_token).long()  
 
 
-    y = torch.ones(n_samples,dtype=int,device=device)*3 # labels, 0 is for null class
+    y = torch.ones(n_samples,dtype=int,device=device)*0 # labels, 0 is for null class
     n_plots = 9
     linspace_to_plot = torch.linspace(0,  1 - epsilon, n_plots)
 
@@ -114,7 +114,7 @@ def main(cfg: DictConfig):
                         cfg_scale=3)
     print(sol.shape) # [sampling_steps, n_samples, seq_length]
     final_seqs=sol[-1].cpu().numpy()
-    np.save("output_samples/fb_cond_uniform_2000_100_class3_cfg3_mod.npy",final_seqs)
+    np.save("output_samples/mel_uncond_masked_20_100.npy",final_seqs)
     # Assuming sol is your tensor with shape [9, 2, 500]
     last_generation = sol[-1, 2]  # Gets last timestep (-1), first sample (0)
     last_generation = last_generation.cpu().numpy()

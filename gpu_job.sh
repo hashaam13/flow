@@ -14,4 +14,4 @@ conda activate flow_matching
 
 cd ~/flow
 
-python dna_flow.py # to stop, scancel <job_id>
+python promoter_flow.py # to stop, scancel <job_id>

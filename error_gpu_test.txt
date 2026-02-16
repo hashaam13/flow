@@ -1,2 +1,29 @@
+/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/selene_sdk/sequences/genome.py:9: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
 /home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/hydra/_internal/defaults_list.py:251: UserWarning: In 'config': Defaults list is missing `_self_`. See https://hydra.cc/docs/1.2/upgrades/1.0_to_1.1/default_composition_order for more information
   warnings.warn(msg, UserWarning)
+/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/utils/data/dataloader.py:624: UserWarning: This DataLoader will create 16 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/utils/data/dataloader.py:624: UserWarning: This DataLoader will create 16 worker processes in total. Our suggested max number of worker in current system is 1, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  warnings.warn(
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/hmuhammad/flow/promoter_flow.py", line 115, in main
+    logits = probability_denoiser(x=path_sample.x_t, t=path_sample.t, signal=signal)
+  File "/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/hmuhammad/flow/promoter_model.py", line 115, in forward
+    h = self.act(block(norm(out + dense(embed)[:, :, None])))
+  File "/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/nn/modules/conv.py", line 375, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/hmuhammad/.conda/envs/flow_matching/lib/python3.9/site-packages/torch/nn/modules/conv.py", line 370, in _conv_forward
+    return F.conv1d(
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 1024.00 MiB. GPU 0 has a total capacity of 79.14 GiB of which 436.75 MiB is free. Including non-PyTorch memory, this process has 78.70 GiB memory in use. Of the allocated memory 78.11 GiB is allocated by PyTorch, and 103.08 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.

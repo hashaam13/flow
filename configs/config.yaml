@@ -1,20 +1,20 @@
 defaults:
   - model: cnn
-  - dataset: deepflybrain   # deepflybrain or deepmel2
+  - dataset: deepmel2  # deepflybrain or deepmel2
 
 # Training settings
 train:
-  batch_size: 3000
+  batch_size: 1024
   lr: 5e-4
-  epochs: 2000
+  epochs: 600
   warmup: 500
   clip_grad: true
   save_dir: "/home/hmuhammad/flow/data"
   plot_dir: "/home/hmuhammad/flow/plots"
-  classifier_free_guidance: true
+  classifier_free_guidance: false
 
 # General settings
 device: "cuda:0"
 seed: 42
 epsilon: 1e-3
-source_distribution: "uniform"  # "mask or uniform"
+source_distribution: "mask"  # "mask or uniform"

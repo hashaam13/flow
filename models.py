@@ -262,6 +262,14 @@ class WrappedModel(ModelWrapper):
             cond_logits = self.model(x, t, cls=label)
             #cfg_scale = self.cfg_schedule(t, s_max=cfg_scale)
             logits= uncond_logits + (cond_logits-uncond_logits)*cfg_scale
+            #output1 = torch.softmax(logits, dim=-1)
+
+            #rates_u = torch.softmax(uncond_logits, dim=-1)
+            #rates_c = torch.softmax(cond_logits, dim=-1)
+            #rates = rates_u + cfg_scale * (rates_c - rates_u)
+            #rates = torch.clamp(rates, min=1e-8)
+            #rates = rates / rates.sum(dim=-1, keepdim=True)
+
             return torch.softmax(logits, dim=-1)
         
 # Activation class
